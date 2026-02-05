@@ -1,29 +1,32 @@
-// packages/core/src/pool.ts
 import { must } from './env';
 
 export function getPoolKey(): string {
     return process.env.DEEPBOOK_POOL_KEY ?? 'SUI_DBUSDC';
 }
 
-export function coinKeysFromPoolKey(poolKey: string): { base: string; quote: string } {
-    const parts = poolKey.split('_').filter(Boolean);
+export function inferCoinKeysFromPool(poolKey: string): { baseKey: string; quoteKey: string } {
+    const parts = poolKey.split('_');
     if (parts.length < 2) {
-        throw new Error(`Invalid DEEPBOOK_POOL_KEY="${poolKey}". Expected "BASE_QUOTE" (e.g., SUI_DBUSDC).`);
+        throw new Error(
+            `Cannot infer coin keys from DEEPBOOK_POOL_KEY="${poolKey}". ` +
+            `Set POOL_BASE_COIN_KEY and POOL_QUOTE_COIN_KEY in .env.`,
+        );
     }
-    return { base: parts[0], quote: parts.slice(1).join('_') };
+    return { baseKey: parts[0], quoteKey: parts.slice(1).join('_') };
 }
 
-/**
- * Optional overrides for cases where DeepBook coinKey differs from poolKey tokens.
- * Example:
- *   DEEPBOOK_BASE_COIN_KEY=SUI
- *   DEEPBOOK_QUOTE_COIN_KEY=DBUSDC
- */
-export function coinKeysForPool(poolKey: string): { baseCoinKey: string; quoteCoinKey: string } {
-    const base = process.env.POOL_BASE_COIN_KEY ?? process.env.DEEPBOOK_BASE_COIN_KEY;
-    const quote = process.env.POOL_QUOTE_COIN_KEY ?? process.env.DEEPBOOK_QUOTE_COIN_KEY;
-    if (base && quote) return { baseCoinKey: base, quoteCoinKey: quote };
+export function getCoinKeys(): { baseKey: string; quoteKey: string } {
+    const poolKey = getPoolKey();
+    const inferred = inferCoinKeysFromPool(poolKey);
+    return {
+        baseKey: process.env.POOL_BASE_COIN_KEY ?? inferred.baseKey,
+        quoteKey: process.env.POOL_QUOTE_COIN_KEY ?? inferred.quoteKey,
+    };
+}
 
-    const { base: b, quote: q } = coinKeysFromPoolKey(poolKey);
-    return { baseCoinKey: b, quoteCoinKey: q };
+export function getManager(): { managerId: string; managerKey: string } {
+    return {
+        managerId: must('BALANCE_MANAGER_ID'),
+        managerKey: must('BALANCE_MANAGER_KEY'),
+    };
 }

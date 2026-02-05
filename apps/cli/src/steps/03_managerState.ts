@@ -1,7 +1,7 @@
 
 import { loadEnv, must } from '@deepgrid/core/env';
 import { makeDeepbookClient } from '@deepgrid/core/sui';
-import { getPoolKey, coinKeysForPool } from '@deepgrid/core/pool';
+import { getPoolKey, getCoinKeys, getManager } from '@deepgrid/core/pool';
 import { logStep } from '@deepgrid/db';
 
 function microToPrice(priceMicro: number): number {
@@ -14,11 +14,11 @@ async function main() {
 
     const env = must('SUI_ENV') as 'testnet' | 'mainnet';
     const owner = must('SUI_ADDRESS');
-    const managerId = must('BALANCE_MANAGER_ID');
-    const managerKey = must('BALANCE_MANAGER_KEY');
-
     const poolKey = getPoolKey();
-    const { baseCoinKey, quoteCoinKey } = coinKeysForPool(poolKey);
+
+    const { baseKey, quoteKey } = getCoinKeys();
+    const { managerId, managerKey } = getManager();
+
     const verbose = process.env.VERBOSE === '1';
 
     try {
@@ -32,8 +32,8 @@ async function main() {
         const [mid, params, baseBal, quoteBal, locked, openOrderIds] = await Promise.all([
             client.deepbook.midPrice(poolKey),
             client.deepbook.poolBookParams(poolKey),
-            client.deepbook.checkManagerBalance(managerKey, baseCoinKey),
-            client.deepbook.checkManagerBalance(managerKey, quoteCoinKey),
+            client.deepbook.checkManagerBalance(managerKey, baseKey),
+            client.deepbook.checkManagerBalance(managerKey, quoteKey),
             client.deepbook.lockedBalance(poolKey, managerKey),
             client.deepbook.accountOpenOrders(poolKey, managerKey),
         ]);
@@ -74,10 +74,10 @@ async function main() {
             poolKey,
             managerKey,
             managerId,
-            coins: { baseKey: baseCoinKey, quoteKey: quoteCoinKey },
+            coins: { baseKey, quoteKey },
             mid,
             book: params,
-            available: { [baseCoinKey]: baseBal, [quoteCoinKey]: quoteBal },
+            available: { [baseKey]: baseBal, [quoteKey]: quoteBal },
             locked,
             openOrdersCount: openOrderIds.length,
             openOrdersDecoded,

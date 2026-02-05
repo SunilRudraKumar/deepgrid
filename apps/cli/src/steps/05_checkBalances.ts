@@ -1,6 +1,6 @@
 import { loadEnv, must } from '@deepgrid/core/env';
 import { makeDeepbookClient } from '@deepgrid/core/sui';
-import { getPoolKey, coinKeysForPool } from '@deepgrid/core/pool';
+import { getPoolKey, getCoinKeys, getManager } from '@deepgrid/core/pool';
 import { logStep } from '@deepgrid/db';
 
 async function main() {
@@ -9,12 +9,10 @@ async function main() {
 
   const env = must('SUI_ENV') as 'testnet' | 'mainnet';
   const owner = must('SUI_ADDRESS');
-  const managerId = must('BALANCE_MANAGER_ID');
-  const managerKey = must('BALANCE_MANAGER_KEY');
-
   const poolKey = getPoolKey();
-  const { baseCoinKey, quoteCoinKey } = coinKeysForPool(poolKey);
 
+  const { baseKey, quoteKey } = getCoinKeys();
+  const { managerId, managerKey } = getManager();
 
   try {
     const client = makeDeepbookClient({
@@ -25,8 +23,8 @@ async function main() {
     });
 
     const [baseBal, quoteBal] = await Promise.all([
-      client.deepbook.checkManagerBalance(managerKey, baseCoinKey),
-      client.deepbook.checkManagerBalance(managerKey, quoteCoinKey),
+      client.deepbook.checkManagerBalance(managerKey, baseKey),
+      client.deepbook.checkManagerBalance(managerKey, quoteKey),
     ]);
 
     const output = {
@@ -35,10 +33,10 @@ async function main() {
       poolKey,
       managerKey,
       managerId,
-      coins: { baseKey: baseCoinKey, quoteKey: quoteCoinKey },
+      coins: { baseKey, quoteKey },
       balances: {
-        [baseCoinKey]: baseBal,
-        [quoteCoinKey]: quoteBal,
+        [baseKey]: baseBal,
+        [quoteKey]: quoteBal,
       },
     };
 
