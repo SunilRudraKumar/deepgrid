@@ -1,10 +1,13 @@
 {
   "name": "deepgrid",
+  "private": true,
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "mid": "node --import tsx/esm src/steps/01_midPrice.ts",
+    "managers": "node --import tsx/esm src/steps/02_listManagers.ts",
+    "balances": "node --import tsx/esm src/steps/05_checkBalances.ts"
   },
   "keywords": [],
   "author": "",
