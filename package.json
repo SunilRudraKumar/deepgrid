@@ -6,6 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "pnpm -r test",
+    "bot:gen": "pnpm --filter @deepgrid/cli bot:gen",
+    "bot:fund": "pnpm --filter @deepgrid/cli bot:fund",
+    "tradecap:mint": "pnpm --filter @deepgrid/cli tradecap:mint",
     "mid": "pnpm --filter @deepgrid/cli mid",
     "pools": "pnpm --filter @deepgrid/cli pools",
     "managers": "pnpm --filter @deepgrid/cli managers",

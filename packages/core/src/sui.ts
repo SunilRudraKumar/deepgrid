@@ -3,6 +3,7 @@ import { deepbook } from '@mysten/deepbook-v3';
 import { SuiGrpcClient } from '@mysten/sui/grpc';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { opt } from './env';
 
 export type Net = 'testnet' | 'mainnet';
 
@@ -16,6 +17,10 @@ export function keypairFromSuiPrivKey(pk: string): Ed25519Keypair {
   const { scheme, secretKey } = decodeSuiPrivateKey(pk);
   if (scheme !== 'ED25519') throw new Error(`Unsupported scheme: ${scheme}`);
   return Ed25519Keypair.fromSecretKey(secretKey);
+}
+
+export function poolKeyFromEnv(fallback = 'SUI_DBUSDC'): string {
+  return opt('DEEPBOOK_POOL_KEY') ?? fallback;
 }
 
 /**

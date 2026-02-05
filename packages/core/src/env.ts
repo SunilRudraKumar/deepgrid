@@ -25,29 +25,34 @@ export function loadEnv(): void {
   }
 }
 
-export function opt(name: string): string | undefined {
+export function must(name: string): string {
   const v = process.env[name];
-  return v && v.trim().length > 0 ? v : undefined;
-}
-
-export function get(name: string): string | undefined {
-  const v = process.env[name];
-  return v && v.length ? v : undefined;
-}
-
-export function must(name: string, hint?: string): string {
-  const v = opt(name);
-  if (!v) {
-    throw new Error(
-      hint
-        ? `Missing ${name}. ${hint}`
-        : `Missing ${name}. Add it to .env at repo root.`,
-    );
-  }
+  if (!v) throw new Error(`Missing ${name}`);
   return v;
 }
 
-/** Require one of these env vars to be set (useful for "OWNER_PRIVATE_KEY OR BOT_PRIVATE_KEY"). */
+export function opt(name: string): string | undefined {
+  const v = process.env[name];
+  return v && v.length > 0 ? v : undefined;
+}
+
+export function num(name: string, def: number): number {
+  const v = opt(name);
+  if (!v) return def;
+  const n = Number(v);
+  if (!Number.isFinite(n)) throw new Error(`Invalid number for ${name}: ${v}`);
+  return n;
+}
+
+export function mustOneOf(...names: string[]): string {
+  for (const n of names) {
+    const v = opt(n);
+    if (v) return v;
+  }
+  throw new Error(`Missing one of: ${names.join(', ')}`);
+}
+
+/** Legacy helper, kept for compatibility if needed, but mustOneOf is preferred */
 export function mustAny(
   names: string[],
   hint?: string,
@@ -59,7 +64,7 @@ export function mustAny(
   throw new Error(
     hint
       ? `Missing one of: ${names.join(', ')}. ${hint}`
-      : `Missing one of: ${names.join(', ')}. Add one to .env at repo root.`,
+      : `Missing one of: ${names.join(', ')}.`,
   );
 }
 

@@ -12,6 +12,9 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
+    "bot:gen": "node --import tsx/esm src/steps/03_generateBotKey.ts",
+    "bot:fund": "node --import tsx/esm src/steps/04_fundBotGas.ts",
+    "tradecap:mint": "node --import tsx/esm src/steps/05_mintTradeCap.ts",
     "mid": "node --import tsx/esm src/steps/01_midPrice.ts",
     "pools": "node --import tsx/esm src/steps/00_listPools.ts",
     "managers": "node --import tsx/esm src/steps/02_listManagers.ts",
