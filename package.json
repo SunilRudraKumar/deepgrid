@@ -9,6 +9,7 @@
     "mid": "pnpm --filter @deepgrid/cli mid",
     "managers": "pnpm --filter @deepgrid/cli managers",
     "state": "pnpm --filter @deepgrid/cli state",
+    "orders": "pnpm --filter @deepgrid/cli orders",
     "balances": "pnpm --filter @deepgrid/cli balances"
   },
   "keywords": [],

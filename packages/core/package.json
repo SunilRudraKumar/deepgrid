@@ -1,24 +1,21 @@
 {
   "name": "@deepgrid/core",
-  "private": true,
+  "version": "1.0.0",
   "type": "module",
   "exports": {
+    "./index": "./src/index.ts",
     "./env": "./src/env.ts",
     "./sui": "./src/sui.ts",
-    "./gridMath": "./src/gridMath.ts",
     "./pool": "./src/pool.ts"
   },
   "dependencies": {
     "@mysten/deepbook-v3": "1.0.3",
     "@mysten/sui": "2.2.0",
-    "zod": "^3.24.1"
+    "dotenv": "^16.4.7"
   },
   "devDependencies": {
-    "vitest": "^2.1.8",
-    "typescript": "^5.9.3",
-    "@types/node": "^22.13.4"
-  },
-  "scripts": {
-    "test": "vitest run"
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   }
 }

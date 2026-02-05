@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import dotenv from 'dotenv';
+import { z } from 'zod';
 
 function findRepoRoot(startDir = process.cwd()): string {
   let dir = startDir;
@@ -12,20 +13,10 @@ function findRepoRoot(startDir = process.cwd()): string {
   }
 }
 
-type LoadEnvOptions = {
-  /** defaults to repo root */
-  rootDir?: string;
-  /**
-   * Load order (later files override earlier ones).
-   * Default: [".env", ".env.local"]
-   */
-  files?: string[];
-};
-
-export function loadEnv(opts: LoadEnvOptions = {}): void {
-  const root = opts.rootDir ?? findRepoRoot();
-  const files = opts.files ?? ['.env', '.env.local'];
-
+export function loadEnv(): void {
+  const root = findRepoRoot();
+  // Support .env.local override if present (good practice, though not strictly in snippet)
+  const files = ['.env', '.env.local'];
   for (const f of files) {
     const p = path.join(root, f);
     if (fs.existsSync(p)) {
@@ -37,6 +28,11 @@ export function loadEnv(opts: LoadEnvOptions = {}): void {
 export function opt(name: string): string | undefined {
   const v = process.env[name];
   return v && v.trim().length > 0 ? v : undefined;
+}
+
+export function get(name: string): string | undefined {
+  const v = process.env[name];
+  return v && v.length ? v : undefined;
 }
 
 export function must(name: string, hint?: string): string {
