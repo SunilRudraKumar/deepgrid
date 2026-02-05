@@ -5,7 +5,8 @@
   "exports": {
     "./env": "./src/env.ts",
     "./sui": "./src/sui.ts",
-    "./gridMath": "./src/gridMath.ts"
+    "./gridMath": "./src/gridMath.ts",
+    "./pool": "./src/pool.ts"
   },
   "dependencies": {
     "@mysten/deepbook-v3": "1.0.3",

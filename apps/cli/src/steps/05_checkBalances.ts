@@ -1,52 +1,75 @@
+// apps/cli/src/steps/05_checkBalances.ts
 import { loadEnv, must } from '@deepgrid/core/env';
 import { makeDeepbookClient } from '@deepgrid/core/sui';
+import { coinKeysForPool, getPoolKey } from '@deepgrid/core/pool';
 
-type Env = 'testnet' | 'mainnet';
-
-function isSuiAddress(x: string): boolean {
-  return /^0x[0-9a-fA-F]{64}$/.test(x);
-}
-
-async function safeBalance(
+async function safeCheck(
   client: any,
   managerKey: string,
   coinKey: string,
-): Promise<unknown> {
+): Promise<{ ok: true; value: any } | { ok: false; error: string }> {
   try {
-    return await client.deepbook.checkManagerBalance(managerKey, coinKey);
+    const value = await client.deepbook.checkManagerBalance(managerKey, coinKey);
+    return { ok: true, value };
   } catch (e: any) {
-    return {
-      error: true,
-      coinKey,
-      message: e?.message ?? String(e),
-    };
+    return { ok: false, error: e?.message ?? String(e) };
   }
 }
 
 async function main() {
   loadEnv();
 
-  const env = must('SUI_ENV') as Env;
+  const env = must('SUI_ENV') as 'testnet' | 'mainnet';
   const owner = must('SUI_ADDRESS');
   const managerId = must('BALANCE_MANAGER_ID');
-  const managerKey = must('BALANCE_MANAGER_KEY'); // matches your .env
+  const managerKey = must('BALANCE_MANAGER_KEY');
 
-  if (!isSuiAddress(owner)) throw new Error(`Invalid SUI_ADDRESS: ${owner}`);
-  if (!isSuiAddress(managerId)) throw new Error(`Invalid BALANCE_MANAGER_ID: ${managerId}`);
+  const poolKey = getPoolKey();
+  const { baseCoinKey, quoteCoinKey } = coinKeysForPool(poolKey);
 
   const client = makeDeepbookClient({
     net: env,
-    address: owner, // for read-only devInspect calls, owner address is correct
+    address: owner,
     managerKey,
     managerId,
   });
 
-  const balances = {
-    SUI: await safeBalance(client, managerKey, 'SUI'),
-    DBUSDC: await safeBalance(client, managerKey, 'DBUSDC'),
-  };
+  const base = await safeCheck(client, managerKey, baseCoinKey);
+  const quote = await safeCheck(client, managerKey, quoteCoinKey);
 
-  console.log({ env, owner, managerKey, managerId, balances });
+  if (!base.ok || !quote.ok) {
+    console.log({
+      env,
+      owner,
+      poolKey,
+      managerKey,
+      managerId,
+      error: 'One or more coin keys are not recognized by DeepBook config.',
+      tried: { baseCoinKey, quoteCoinKey },
+      hints: [
+        'If the pool uses different DeepBook coin keys, set overrides:',
+        '  DEEPBOOK_BASE_COIN_KEY=...',
+        '  DEEPBOOK_QUOTE_COIN_KEY=...',
+      ],
+      details: {
+        base: base.ok ? null : base.error,
+        quote: quote.ok ? null : quote.error,
+      },
+    });
+    process.exit(1);
+  }
+
+  console.log({
+    env,
+    owner,
+    poolKey,
+    managerKey,
+    managerId,
+    balances: {
+      [baseCoinKey]: base.value,
+      [quoteCoinKey]: quote.value,
+    },
+  });
 }
 
 main().catch((e) => {
