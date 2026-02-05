@@ -8,6 +8,7 @@
     "test": "pnpm -r test",
     "mid": "pnpm --filter @deepgrid/cli mid",
     "managers": "pnpm --filter @deepgrid/cli managers",
+    "state": "pnpm --filter @deepgrid/cli state",
     "balances": "pnpm --filter @deepgrid/cli balances"
   },
   "keywords": [],
