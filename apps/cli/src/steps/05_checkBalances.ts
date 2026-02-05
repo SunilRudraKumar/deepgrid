@@ -3,19 +3,6 @@ import { makeDeepbookClient } from '@deepgrid/core/sui';
 import { getPoolKey, coinKeysForPool } from '@deepgrid/core/pool';
 import { logStep } from '@deepgrid/db';
 
-async function safeCheck(
-  client: any,
-  managerKey: string,
-  coinKey: string,
-): Promise<{ ok: true; value: any } | { ok: false; error: string }> {
-  try {
-    const value = await client.deepbook.checkManagerBalance(managerKey, coinKey);
-    return { ok: true, value };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? String(e) };
-  }
-}
-
 async function main() {
   const t0 = Date.now();
   loadEnv();
@@ -28,6 +15,7 @@ async function main() {
   const poolKey = getPoolKey();
   const { baseCoinKey, quoteCoinKey } = coinKeysForPool(poolKey);
 
+
   try {
     const client = makeDeepbookClient({
       net: env,
@@ -36,17 +24,10 @@ async function main() {
       managerId,
     });
 
-    const base = await safeCheck(client, managerKey, baseCoinKey);
-    const quote = await safeCheck(client, managerKey, quoteCoinKey);
-
-    const result = {
-      base: base.ok ? { coin: baseCoinKey, value: base.value } : { coin: baseCoinKey, error: base.error },
-      quote: quote.ok ? { coin: quoteCoinKey, value: quote.value } : { coin: quoteCoinKey, error: quote.error },
-    };
-
-    if (!base.ok || !quote.ok) {
-      throw new Error(`Balance check partial failure: ${JSON.stringify(result)}`);
-    }
+    const [baseBal, quoteBal] = await Promise.all([
+      client.deepbook.checkManagerBalance(managerKey, baseCoinKey),
+      client.deepbook.checkManagerBalance(managerKey, quoteCoinKey),
+    ]);
 
     const output = {
       env,
@@ -54,9 +35,10 @@ async function main() {
       poolKey,
       managerKey,
       managerId,
+      coins: { baseKey: baseCoinKey, quoteKey: quoteCoinKey },
       balances: {
-        [baseCoinKey]: base.value,
-        [quoteCoinKey]: quote.value,
+        [baseCoinKey]: baseBal,
+        [quoteCoinKey]: quoteBal,
       },
     };
 

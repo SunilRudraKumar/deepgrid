@@ -14,6 +14,7 @@
   "scripts": {
     "mid": "node --import tsx/esm src/steps/01_midPrice.ts",
     "managers": "node --import tsx/esm src/steps/02_listManagers.ts",
+    "state": "node --import tsx/esm src/steps/03_managerState.ts",
     "balances": "node --import tsx/esm src/steps/05_checkBalances.ts"
   }
 }

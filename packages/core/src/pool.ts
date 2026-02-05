@@ -20,8 +20,8 @@ export function coinKeysFromPoolKey(poolKey: string): { base: string; quote: str
  *   DEEPBOOK_QUOTE_COIN_KEY=DBUSDC
  */
 export function coinKeysForPool(poolKey: string): { baseCoinKey: string; quoteCoinKey: string } {
-    const base = process.env.DEEPBOOK_BASE_COIN_KEY;
-    const quote = process.env.DEEPBOOK_QUOTE_COIN_KEY;
+    const base = process.env.POOL_BASE_COIN_KEY ?? process.env.DEEPBOOK_BASE_COIN_KEY;
+    const quote = process.env.POOL_QUOTE_COIN_KEY ?? process.env.DEEPBOOK_QUOTE_COIN_KEY;
     if (base && quote) return { baseCoinKey: base, quoteCoinKey: quote };
 
     const { base: b, quote: q } = coinKeysFromPoolKey(poolKey);
