@@ -5,12 +5,12 @@ export function getPoolKey(): string {
     return process.env.DEEPBOOK_POOL_KEY ?? 'SUI_DBUSDC';
 }
 
-export function parsePoolKey(poolKey: string): { baseCoinKey: string; quoteCoinKey: string } {
+export function coinKeysFromPoolKey(poolKey: string): { base: string; quote: string } {
     const parts = poolKey.split('_').filter(Boolean);
     if (parts.length < 2) {
-        throw new Error(`Invalid DEEPBOOK_POOL_KEY="${poolKey}". Expected like "SUI_DBUSDC".`);
+        throw new Error(`Invalid DEEPBOOK_POOL_KEY="${poolKey}". Expected "BASE_QUOTE" (e.g., SUI_DBUSDC).`);
     }
-    return { baseCoinKey: parts[0], quoteCoinKey: parts.slice(1).join('_') };
+    return { base: parts[0], quote: parts.slice(1).join('_') };
 }
 
 /**
@@ -23,5 +23,7 @@ export function coinKeysForPool(poolKey: string): { baseCoinKey: string; quoteCo
     const base = process.env.DEEPBOOK_BASE_COIN_KEY;
     const quote = process.env.DEEPBOOK_QUOTE_COIN_KEY;
     if (base && quote) return { baseCoinKey: base, quoteCoinKey: quote };
-    return parsePoolKey(poolKey);
+
+    const { base: b, quote: q } = coinKeysFromPoolKey(poolKey);
+    return { baseCoinKey: b, quoteCoinKey: q };
 }

@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@deepgrid/core": "workspace:*",
+    "@deepgrid/db": "workspace:*",
     "dotenv": "^16.4.7"
   },
   "devDependencies": {

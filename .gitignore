@@ -3,6 +3,8 @@ node_modules
 dist
 .vscode
 .DS_Store
+.deepgrid/
+
 
 # Logs
 npm-debug.log*

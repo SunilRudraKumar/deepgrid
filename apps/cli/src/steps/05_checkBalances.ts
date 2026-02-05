@@ -1,7 +1,7 @@
-// apps/cli/src/steps/05_checkBalances.ts
 import { loadEnv, must } from '@deepgrid/core/env';
 import { makeDeepbookClient } from '@deepgrid/core/sui';
-import { coinKeysForPool, getPoolKey } from '@deepgrid/core/pool';
+import { getPoolKey, coinKeysForPool } from '@deepgrid/core/pool';
+import { logStep } from '@deepgrid/db';
 
 async function safeCheck(
   client: any,
@@ -17,6 +17,7 @@ async function safeCheck(
 }
 
 async function main() {
+  const t0 = Date.now();
   loadEnv();
 
   const env = must('SUI_ENV') as 'testnet' | 'mainnet';
@@ -27,49 +28,67 @@ async function main() {
   const poolKey = getPoolKey();
   const { baseCoinKey, quoteCoinKey } = coinKeysForPool(poolKey);
 
-  const client = makeDeepbookClient({
-    net: env,
-    address: owner,
-    managerKey,
-    managerId,
-  });
+  try {
+    const client = makeDeepbookClient({
+      net: env,
+      address: owner,
+      managerKey,
+      managerId,
+    });
 
-  const base = await safeCheck(client, managerKey, baseCoinKey);
-  const quote = await safeCheck(client, managerKey, quoteCoinKey);
+    const base = await safeCheck(client, managerKey, baseCoinKey);
+    const quote = await safeCheck(client, managerKey, quoteCoinKey);
 
-  if (!base.ok || !quote.ok) {
-    console.log({
+    const result = {
+      base: base.ok ? { coin: baseCoinKey, value: base.value } : { coin: baseCoinKey, error: base.error },
+      quote: quote.ok ? { coin: quoteCoinKey, value: quote.value } : { coin: quoteCoinKey, error: quote.error },
+    };
+
+    if (!base.ok || !quote.ok) {
+      throw new Error(`Balance check partial failure: ${JSON.stringify(result)}`);
+    }
+
+    const output = {
       env,
       owner,
       poolKey,
       managerKey,
       managerId,
-      error: 'One or more coin keys are not recognized by DeepBook config.',
-      tried: { baseCoinKey, quoteCoinKey },
-      hints: [
-        'If the pool uses different DeepBook coin keys, set overrides:',
-        '  DEEPBOOK_BASE_COIN_KEY=...',
-        '  DEEPBOOK_QUOTE_COIN_KEY=...',
-      ],
-      details: {
-        base: base.ok ? null : base.error,
-        quote: quote.ok ? null : quote.error,
+      balances: {
+        [baseCoinKey]: base.value,
+        [quoteCoinKey]: quote.value,
       },
+    };
+
+    console.log(output);
+
+    await logStep({
+      step: 'checkBalances',
+      ok: true,
+      durationMs: Date.now() - t0,
+      env,
+      poolKey,
+      address: owner,
+      managerId,
+      managerKey,
+      output,
     });
+
+  } catch (e) {
+    await logStep({
+      step: 'checkBalances',
+      ok: false,
+      durationMs: Date.now() - t0,
+      env,
+      poolKey,
+      address: owner,
+      managerId,
+      managerKey,
+      error: e,
+    });
+    console.error(e);
     process.exit(1);
   }
-
-  console.log({
-    env,
-    owner,
-    poolKey,
-    managerKey,
-    managerId,
-    balances: {
-      [baseCoinKey]: base.value,
-      [quoteCoinKey]: quote.value,
-    },
-  });
 }
 
 main().catch((e) => {
