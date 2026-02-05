@@ -5,9 +5,10 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "mid": "node --import tsx/esm src/steps/01_midPrice.ts",
-    "managers": "node --import tsx/esm src/steps/02_listManagers.ts",
-    "balances": "node --import tsx/esm src/steps/05_checkBalances.ts"
+    "test": "pnpm -r test",
+    "mid": "pnpm --filter @deepgrid/cli mid",
+    "managers": "pnpm --filter @deepgrid/cli managers",
+    "balances": "pnpm --filter @deepgrid/cli balances"
   },
   "keywords": [],
   "author": "",
