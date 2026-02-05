@@ -1,39 +1,36 @@
-import 'dotenv/config';
-import { loadEnv, must } from '../lib/env.js';
-import { keypairFromSuiPrivKey, makeDeepbookClient } from '../lib/sui.js';
+
+import { loadEnv, must } from '@deepgrid/core/env';
+import { makeDeepbookClient } from '@deepgrid/core/sui';
 
 async function main() {
-  const env = loadEnv();
-  const pk = must(env.OWNER_PRIVATE_KEY ?? env.BOT_PRIVATE_KEY, 'OWNER_PRIVATE_KEY or BOT_PRIVATE_KEY');
-
-  const kp = keypairFromSuiPrivKey(pk);
-  const owner = kp.toSuiAddress();
-
-  const managerId = must(env.BALANCE_MANAGER_ID, 'BALANCE_MANAGER_ID');
+  loadEnv();
+  const env = must('SUI_ENV') as 'testnet' | 'mainnet';
+  const owner = must('SUI_ADDRESS');
+  const managerId = must('BALANCE_MANAGER_ID');
+  const managerKey = must('BALANCE_MANAGER_KEY');
 
   const client = makeDeepbookClient({
-    net: env.SUI_ENV,
+    net: env,
     address: owner,
-    managerKey: env.BALANCE_MANAGER_KEY,
+    managerKey,
     managerId,
-    // tradeCap not needed just to read balances (safe to omit)
   });
 
   const balances = {
     SUI: await client.deepbook.checkManagerBalance({
-      managerKey: env.BALANCE_MANAGER_KEY,
+      managerKey,
       coinKey: 'SUI',
     }),
     DBUSDC: await client.deepbook.checkManagerBalance({
-      managerKey: env.BALANCE_MANAGER_KEY,
+      managerKey,
       coinKey: 'DBUSDC',
     }),
   };
 
   console.log({
-    env: env.SUI_ENV,
+    env,
     owner,
-    managerKey: env.BALANCE_MANAGER_KEY,
+    managerKey,
     managerId,
     balances,
   });

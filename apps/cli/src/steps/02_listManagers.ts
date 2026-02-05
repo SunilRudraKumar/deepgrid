@@ -1,19 +1,16 @@
-import 'dotenv/config';
-import { loadEnv, must } from '../lib/env.js';
-import { keypairFromSuiPrivKey, makeDeepbookClient } from '../lib/sui.js';
+
+import { loadEnv, must } from '@deepgrid/core/env';
+import { makeDeepbookClient } from '@deepgrid/core/sui';
 
 async function main() {
-  const env = loadEnv();
-  const pk = must(env.OWNER_PRIVATE_KEY ?? env.BOT_PRIVATE_KEY, 'OWNER_PRIVATE_KEY or BOT_PRIVATE_KEY');
+  loadEnv();
+  const env = must('SUI_ENV') as 'testnet' | 'mainnet';
+  const owner = must('SUI_ADDRESS');
 
-  const kp = keypairFromSuiPrivKey(pk);
-  const owner = kp.toSuiAddress();
-
-  const client = makeDeepbookClient({ net: env.SUI_ENV, address: owner });
-
+  const client = makeDeepbookClient({ net: env, address: owner });
   const ids = await client.deepbook.getBalanceManagerIds(owner);
 
-  console.log({ env: env.SUI_ENV, owner, count: ids.length, ids });
+  console.log({ env, owner, count: ids.length, ids });
 }
 
 main().catch((e) => {
