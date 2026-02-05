@@ -1,6 +1,5 @@
 import { loadEnv, must } from '@deepgrid/core/env';
-import { resolvePoolCoins } from '@deepgrid/core/pool';
-import { makeDeepbookClient } from '@deepgrid/core/sui';
+import { makeDeepbookClient, resolvePoolCoinKeys } from '@deepgrid/core/sui';
 import { logStep } from '@deepgrid/db';
 
 async function main() {
@@ -12,7 +11,13 @@ async function main() {
   const managerId = must('BALANCE_MANAGER_ID');
   const managerKey = must('BALANCE_MANAGER_KEY');
 
-  const { poolKey, baseCoinKey, quoteCoinKey } = resolvePoolCoins();
+  const poolKey = process.env.DEEPBOOK_POOL_KEY ?? 'SUI_DBUSDC';
+
+  // Optional overrides if you ever use a pool key the SDK doesn’t recognize yet
+  // Using simplified names as per previous plan: BASE_COIN_KEY / QUOTE_COIN_KEY
+  // Fallback to POOL_BASE_COIN_KEY if previously set, or user's new suggestion BASE_COIN_KEY
+  const baseOverride = process.env.BASE_COIN_KEY ?? process.env.POOL_BASE_COIN_KEY;
+  const quoteOverride = process.env.QUOTE_COIN_KEY ?? process.env.POOL_QUOTE_COIN_KEY;
 
   try {
     const client = makeDeepbookClient({
@@ -21,6 +26,17 @@ async function main() {
       managerKey,
       managerId,
     });
+
+    let baseCoinKey: string;
+    let quoteCoinKey: string;
+
+    try {
+      ({ baseCoinKey, quoteCoinKey } = resolvePoolCoinKeys(env, poolKey));
+    } catch (e) {
+      if (!baseOverride || !quoteOverride) throw e;
+      baseCoinKey = baseOverride;
+      quoteCoinKey = quoteOverride;
+    }
 
     const [baseBal, quoteBal] = await Promise.all([
       client.deepbook.checkManagerBalance(managerKey, baseCoinKey),
@@ -33,7 +49,8 @@ async function main() {
       poolKey,
       managerKey,
       managerId,
-      coins: { baseCoinKey, quoteCoinKey },
+      baseCoinKey,
+      quoteCoinKey,
       balances: {
         [baseCoinKey]: baseBal,
         [quoteCoinKey]: quoteBal,

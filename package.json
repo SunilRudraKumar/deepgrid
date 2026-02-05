@@ -7,6 +7,7 @@
   "scripts": {
     "test": "pnpm -r test",
     "mid": "pnpm --filter @deepgrid/cli mid",
+    "pools": "pnpm --filter @deepgrid/cli pools",
     "managers": "pnpm --filter @deepgrid/cli managers",
     "state": "pnpm --filter @deepgrid/cli state",
     "orders": "pnpm --filter @deepgrid/cli orders",

@@ -13,6 +13,7 @@
   },
   "scripts": {
     "mid": "node --import tsx/esm src/steps/01_midPrice.ts",
+    "pools": "node --import tsx/esm src/steps/00_listPools.ts",
     "managers": "node --import tsx/esm src/steps/02_listManagers.ts",
     "state": "node --import tsx/esm src/steps/03_managerState.ts",
     "orders": "node --import tsx/esm src/steps/03_openOrders.ts",

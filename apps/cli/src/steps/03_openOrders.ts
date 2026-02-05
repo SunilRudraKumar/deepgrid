@@ -1,5 +1,4 @@
 import { loadEnv, must } from '@deepgrid/core/env';
-import { resolvePoolCoins } from '@deepgrid/core/pool';
 import { makeDeepbookClient } from '@deepgrid/core/sui';
 import { logStep } from '@deepgrid/db';
 
@@ -11,7 +10,7 @@ async function main() {
     const owner = must('SUI_ADDRESS');
     const managerId = must('BALANCE_MANAGER_ID');
     const managerKey = must('BALANCE_MANAGER_KEY');
-    const { poolKey } = resolvePoolCoins();
+    const poolKey = process.env.DEEPBOOK_POOL_KEY ?? 'SUI_DBUSDC';
 
     try {
         const client = makeDeepbookClient({

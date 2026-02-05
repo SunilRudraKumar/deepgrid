@@ -1,8 +1,8 @@
+import * as deepbookV3 from '@mysten/deepbook-v3';
 import { deepbook } from '@mysten/deepbook-v3';
 import { SuiGrpcClient } from '@mysten/sui/grpc';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
-import { isValidSuiAddress } from '@mysten/sui/utils';
 
 export type Net = 'testnet' | 'mainnet';
 
@@ -18,69 +18,74 @@ export function keypairFromSuiPrivKey(pk: string): Ed25519Keypair {
   return Ed25519Keypair.fromSecretKey(secretKey);
 }
 
-function assertValidAddress(addr: string, name: string): void {
-  if (!isValidSuiAddress(addr)) throw new Error(`Invalid ${name}: ${addr}`);
+/**
+ * Read pool metadata from the SDK exports.
+ * This avoids hardcoding DBUSDC/SUI and makes switching pools trivial.
+ */
+function poolsFor(net: Net): Record<string, any> | undefined {
+  const key = net === 'mainnet' ? 'mainnetPools' : 'testnetPools';
+  return (deepbookV3 as any)[key] as Record<string, any> | undefined;
 }
 
-export type DeepbookClientArgs = {
-  net: Net;
-  /** signer / read address used by the deepbook plugin */
-  address: string;
-
-  /** Optional. Needed for manager ops + trading */
-  managerKey?: string;
-  managerId?: string;
-
-  /** Optional. Only if placing orders "as bot" with a TradeCap */
-  tradeCapId?: string;
-
-  /**
-   * Optional convenience: pass poolKey around cleanly in CLI steps.
-   * Deepbook client doesn’t need it, but it helps standardize your step signatures.
-   */
-  poolKey?: string;
-};
-
-export type DeepbookContext = {
-  net: Net;
-  address: string;
-  managerKey?: string;
-  managerId?: string;
-  tradeCapId?: string;
-  poolKey?: string;
-};
+export function listKnownPools(net: Net): Array<{
+  poolKey: string;
+  baseCoinKey: string;
+  quoteCoinKey: string;
+}> {
+  const pools = poolsFor(net);
+  if (!pools) return [];
+  return Object.entries(pools).map(([poolKey, p]) => ({
+    poolKey,
+    baseCoinKey: String((p as any).baseCoin ?? ''),
+    quoteCoinKey: String((p as any).quoteCoin ?? ''),
+  }));
+}
 
 /**
- * Creates a SuiGrpcClient extended with deepbook() plugin.
- * - Validates addresses
- * - Ensures managerKey+managerId appear together
- * - Ensures tradeCap implies manager is configured
+ * Resolve base/quote coin keys for a pool (e.g. "SUI_DBUSDC" -> { baseCoinKey: "SUI", quoteCoinKey: "DBUSDC" }).
+ * If SDK pool metadata isn’t available (or poolKey unknown), caller can fallback to env overrides.
  */
-export function makeDeepbookClient(args: DeepbookClientArgs) {
-  assertValidAddress(args.address, 'address');
-
-  const hasManagerKey = !!args.managerKey;
-  const hasManagerId = !!args.managerId;
-  if (hasManagerKey !== hasManagerId) {
+export function resolvePoolCoinKeys(
+  net: Net,
+  poolKey: string,
+): { baseCoinKey: string; quoteCoinKey: string } {
+  const pools = poolsFor(net);
+  if (!pools) {
     throw new Error(
-      `Balance manager misconfigured: provide BOTH managerKey and managerId (got managerKey=${String(
-        args.managerKey,
-      )}, managerId=${String(args.managerId)})`,
+      `DeepBook SDK pool metadata not available. Set BASE_COIN_KEY and QUOTE_COIN_KEY env vars as a fallback.`,
     );
   }
 
-  if (args.tradeCapId && !(args.managerKey && args.managerId)) {
-    throw new Error('tradeCapId requires managerKey + managerId.');
+  const p = pools[poolKey];
+  if (!p) {
+    const known = Object.keys(pools);
+    throw new Error(
+      `Unknown DEEPBOOK_POOL_KEY="${poolKey}" for ${net}. Known pools: ${known.join(', ')}`,
+    );
   }
 
-  if (args.managerId) assertValidAddress(args.managerId, 'BALANCE_MANAGER_ID');
+  const baseCoinKey = (p as any).baseCoin;
+  const quoteCoinKey = (p as any).quoteCoin;
 
-  const base = new SuiGrpcClient({
-    network: args.net,
-    baseUrl: fullnodeUrl(args.net),
-  });
+  if (!baseCoinKey || !quoteCoinKey) {
+    throw new Error(
+      `Pool "${poolKey}" is missing baseCoin/quoteCoin metadata. Set BASE_COIN_KEY and QUOTE_COIN_KEY env vars.`,
+    );
+  }
 
-  const client = base.$extend(
+  return { baseCoinKey, quoteCoinKey };
+}
+
+export function makeDeepbookClient(args: {
+  net: Net;
+  address: string;
+
+  // optional: only required for manager ops / trading
+  managerKey?: string;
+  managerId?: string;
+  tradeCapId?: string;
+}) {
+  const client = new SuiGrpcClient({ network: args.net, baseUrl: fullnodeUrl(args.net) }).$extend(
     deepbook({
       address: args.address,
       network: args.net,
@@ -97,19 +102,4 @@ export function makeDeepbookClient(args: DeepbookClientArgs) {
   );
 
   return client;
-}
-
-/**
- * Optional helper: central place to keep "context" for CLI steps.
- * Use it so every step can accept (ctx, client) and you can swap pools easily.
- */
-export function makeContext(args: DeepbookClientArgs): DeepbookContext {
-  return {
-    net: args.net,
-    address: args.address,
-    managerKey: args.managerKey,
-    managerId: args.managerId,
-    tradeCapId: args.tradeCapId,
-    poolKey: args.poolKey,
-  };
 }
