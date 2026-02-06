@@ -1,20 +1,28 @@
+// src/dApp-kit.ts
 import { createDAppKit } from "@mysten/dapp-kit-react";
 import { SuiGrpcClient } from "@mysten/sui/grpc";
 
+const FULLNODE_GRPC_URLS = {
+  mainnet: "https://fullnode.mainnet.sui.io:443",
+  testnet: "https://fullnode.testnet.sui.io:443",
+  devnet: "https://fullnode.devnet.sui.io:443",
+} as const;
+
+export type Networks = keyof typeof FULLNODE_GRPC_URLS;
+
 export const dAppKit = createDAppKit({
-  // ✅ mainnet by default
+  // real funds => mainnet default
   defaultNetwork: "mainnet",
 
-  // ✅ with real funds, do NOT use burner wallet
+  // burner wallet should be OFF for real funds
   enableBurnerWallet: false,
 
-  // ✅ dapp-kit-react expects an array (your current version)
-  networks: [
-    { id: "mainnet", name: "Mainnet", type: "mainnet", default: true },
-    { id: "testnet", name: "Testnet", type: "testnet" },
-    { id: "devnet", name: "Devnet", type: "devnet" },
-  ],
+  networks: Object.keys(FULLNODE_GRPC_URLS) as Networks[],
 
-  // ✅ SuiGrpcClient takes { network }, not { url }
-  createClient: (network) => new SuiGrpcClient({ network }),
+  // create a grpc client per network
+  createClient: ({ network }) =>
+    new SuiGrpcClient({
+      network,
+      baseUrl: FULLNODE_GRPC_URLS[network],
+    }),
 });

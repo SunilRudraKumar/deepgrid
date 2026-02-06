@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "exports": {
+    ".": "./src/index.ts",
     "./index": "./src/index.ts",
     "./env": "./src/env.ts",
     "./sui": "./src/sui.ts",
-    "./pool": "./src/pool.ts"
+    "./pool": "./src/pool.ts",
+    "./pools": "./src/pools.ts",
+    "./trade": "./src/trade.ts"
   },
   "dependencies": {
     "@mysten/deepbook-v3": "1.0.3",

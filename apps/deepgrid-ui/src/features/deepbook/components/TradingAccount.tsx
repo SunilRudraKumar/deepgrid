@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
     useCurrentAccount,
     useCurrentClient,
@@ -7,7 +7,6 @@ import {
 } from "@mysten/dapp-kit-react";
 import { Transaction } from "@mysten/sui/transactions";
 import { deepbook } from "@mysten/deepbook-v3";
-import { useQueryClient } from "@tanstack/react-query";
 
 import {
     Card,
@@ -20,88 +19,69 @@ import {
 import { useBalanceManagers } from "../hooks/useBalanceManagers";
 
 const MANAGER_KEY = "MANAGER";
-const DEFAULT_POOL_KEY = "SUI_DBUSDC";
 
 function lsKey(network: string, address: string) {
     return `deepgrid:bm:${network}:${address}`;
 }
 
-/** Many wallets nest results differently. Search common shapes. */
-function pickFirst<T>(cands: any[], pred: (v: any) => v is T): T | null {
-    for (const c of cands) if (pred(c)) return c;
-    return null;
+/** DeepBook SDK sometimes returns “(tx) => void”, sometimes a tx command. Support both. */
+function applyTx(tx: Transaction, cmdOrFn: any) {
+    if (typeof cmdOrFn === "function") {
+        cmdOrFn(tx);
+        return;
+    }
+    // fallback if SDK returns a command object
+    // @ts-expect-error - tx.add exists in your current setup
+    tx.add(cmdOrFn);
 }
 
+/** Extract digest defensively from different wallet response shapes */
 function extractDigest(res: any): string | null {
-    const candidates = [
-        res?.digest,
-        res?.result?.digest,
-        res?.rawTransaction?.result?.digest,
-        res?.transactionDigest,
-        res?.result?.transactionDigest,
-        res?.effects?.transactionDigest,
-        res?.result?.effects?.transactionDigest,
-        res?.rawTransaction?.result?.effects?.transactionDigest,
-    ];
-    return pickFirst<string>(candidates, (x): x is string => typeof x === "string" && x.length > 0);
+    return (
+        res?.result?.Transaction?.digest ??
+        res?.Transaction?.digest ??
+        res?.digest ??
+        res?.result?.digest ??
+        res?.effects?.transactionDigest ??
+        res?.transactionDigest ??
+        null
+    );
 }
 
-function extractBalanceManagerId(res: any): string | null {
-    const r = res?.result ?? res?.rawTransaction?.result ?? res;
+/** Prefer events, fallback to objectChanges */
+function extractBalanceManagerIdFromTxBlock(txb: any): string | null {
+    const evId =
+        txb?.events
+            ?.map((e: any) => e?.parsedJson?.balance_manager_id)
+            ?.find((x: any) => typeof x === "string" && x.startsWith("0x")) ?? null;
+    if (evId) return evId;
 
-    // 1) events[].parsedJson.balance_manager_id
-    const events = r?.events ?? r?.result?.events;
-    if (Array.isArray(events)) {
-        for (const e of events) {
-            const id = e?.parsedJson?.balance_manager_id;
-            if (typeof id === "string" && id.startsWith("0x")) return id;
-        }
-    }
+    const ocId =
+        txb?.objectChanges
+            ?.map((c: any) => {
+                if (c?.type !== "created") return null;
+                const t = c?.objectType;
+                if (typeof t !== "string") return null;
+                if (!t.includes("::balance_manager::BalanceManager")) return null;
+                return c?.objectId;
+            })
+            ?.find((x: any) => typeof x === "string" && x.startsWith("0x")) ?? null;
 
-    // 2) objectChanges[].created where objectType includes ::balance_manager::BalanceManager
-    const objectChanges = r?.objectChanges ?? r?.result?.objectChanges;
-    if (Array.isArray(objectChanges)) {
-        for (const c of objectChanges) {
-            if (c?.type !== "created") continue;
-            const t = c?.objectType;
-            const id = c?.objectId;
-            if (typeof t === "string" && t.includes("::balance_manager::BalanceManager")) {
-                if (typeof id === "string" && id.startsWith("0x")) return id;
-            }
-        }
-    }
-
-    // 3) effects.created[].reference.objectId (RPC effects shape)
-    const effects = r?.effects ?? r?.result?.effects;
-    const created = effects?.created;
-    if (Array.isArray(created)) {
-        for (const cr of created) {
-            const id = cr?.reference?.objectId ?? cr?.objectId;
-            if (typeof id === "string" && id.startsWith("0x")) return id;
-        }
-    }
-
-    return null;
+    return ocId;
 }
 
 function pickCreateBM(bm: any) {
     const cands = [
-        bm?.createAndShareBalanceManager, // docs name :contentReference[oaicite:1]{index=1}
-        bm?.createAndShareBalanceManager?.bind?.(bm),
-        bm?.createAndShareBalanceManager,
-        bm?.createAndShare,
         bm?.createAndShareBalanceManager,
         bm?.createBalanceManager,
+        bm?.createAndShare,
         bm?.create,
     ];
     return cands.find((f) => typeof f === "function") ?? null;
 }
 
 function pickRegisterBM(deep: any, bm: any) {
-    const cands = [
-        bm?.registerBalanceManager, // docs name :contentReference[oaicite:2]{index=2}
-        deep?.registerBalanceManager,
-    ];
+    const cands = [bm?.registerBalanceManager, deep?.registerBalanceManager];
     return cands.find((f) => typeof f === "function") ?? null;
 }
 
@@ -110,167 +90,130 @@ export function TradingAccount() {
     const network = useCurrentNetwork();
     const client = useCurrentClient();
     const dAppKit = useDAppKit();
-    const queryClient = useQueryClient();
 
     const { managerId, managerIds, setManagerId } = useBalanceManagers();
 
-    const [status, setStatus] = useState("");
+    const [status, setStatus] = useState<string>("");
     const [busy, setBusy] = useState(false);
 
-    const hasRegisteredManager = managerIds.length > 0;
+    const hasRegistered = managerIds.length > 0;
     const displayManagerId = managerId ?? managerIds[0] ?? null;
 
-    // client without mapping (safe for create)
-    const deepNoMgr = useMemo(() => {
+    // DeepBook client (mapping only when we have a manager id)
+    const deepClient = useMemo(() => {
         if (!account) return null;
-        return client.$extend(deepbook({ address: account.address, network }));
-    }, [account, client, network]);
 
-    // client with mapping (required for register/deposit/orders)
-    const deepWithMgr = useMemo(() => {
-        if (!account || !displayManagerId) return null;
+        const balanceManagers = displayManagerId
+            ? { [MANAGER_KEY]: { address: displayManagerId } }
+            : undefined;
+
         return client.$extend(
             deepbook({
                 address: account.address,
                 network,
-                balanceManagers: { [MANAGER_KEY]: { address: displayManagerId } },
+                balanceManagers,
             }),
         );
     }, [account, client, network, displayManagerId]);
 
-    useEffect(() => {
-        if (!account) return;
-        console.log("[TradingAccount]", { network, address: account.address, managerIds, managerId, displayManagerId });
-    }, [account, network, managerIds, managerId, displayManagerId]);
-
-    async function refreshManagers() {
-        if (!account) return;
-        await queryClient.invalidateQueries({
-            queryKey: ["deepbookManagers", network, account.address],
-        });
-    }
-
     async function createTradingAccount() {
-        if (!account || !deepNoMgr) return;
+        if (!account || !deepClient) return;
 
-        if (hasRegisteredManager) {
+        if (hasRegistered) {
             setStatus("Trading account already exists for this wallet.");
             return;
         }
 
         setBusy(true);
         try {
-            setStatus("Creating Balance Manager (wallet will prompt)...");
+            setStatus("Creating Balance Manager (wallet prompt)...");
 
-            const db = (deepNoMgr as any).deepbook;
+            const db = (deepClient as any).deepbook;
             const bm = db?.balanceManager;
 
             const createFn = pickCreateBM(bm);
             if (!createFn) {
                 throw new Error(
-                    `SDK mismatch: createAndShareBalanceManager not found. balanceManager keys: ${Object.keys(bm ?? {}).join(", ")}`
+                    `SDK mismatch: no create BM function found. balanceManager keys: ${Object.keys(
+                        bm ?? {},
+                    ).join(", ")}`,
                 );
             }
 
             const tx = new Transaction();
-            tx.add(createFn());
+            // DeepBook SDK pattern: call builder onto tx :contentReference[oaicite:3]{index=3}
+            applyTx(tx, createFn());
 
             const res = await dAppKit.signAndExecuteTransaction({
                 transaction: tx,
-                options: { showEffects: true, showEvents: true, showObjectChanges: true },
             });
 
-            console.log("[TradingAccount] create res:", res);
-
-            const newId = extractBalanceManagerId(res);
-            if (!newId) {
-                const digest = extractDigest(res);
-                throw new Error(
-                    `Create succeeded but could not extract BalanceManager id. digest=${digest ?? "(none)"} (see console log).`
-                );
+            const digest = extractDigest(res);
+            if (!digest) {
+                throw new Error("No digest returned from wallet response (see console).");
             }
 
-            localStorage.setItem(lsKey(network, account.address), newId);
-            setManagerId(newId);
+            // Read from RPC to reliably get events/objectChanges
+            const txb = await client.getTransactionBlock({
+                digest,
+                options: { showEvents: true, showObjectChanges: true, showEffects: true },
+            });
 
-            setStatus(`Created Balance Manager: ${newId}. Next: Register.`);
+            const newBmId = extractBalanceManagerIdFromTxBlock(txb);
+            if (!newBmId) {
+                throw new Error("Tx succeeded but could not extract BalanceManager id.");
+            }
+
+            localStorage.setItem(lsKey(network, account.address), newBmId);
+            setManagerId(newBmId);
+
+            setStatus(`Created Balance Manager: ${newBmId}. Now register it.`);
         } finally {
             setBusy(false);
         }
     }
 
-    async function registerManager() {
+    async function registerTradingAccount() {
         if (!account) return;
+
         const id = displayManagerId;
         if (!id) {
-            setStatus("No manager id available to register.");
+            setStatus("No Balance Manager id available to register.");
             return;
         }
 
         setBusy(true);
         try {
-            setStatus("Registering Balance Manager (wallet will prompt)...");
+            setStatus("Registering Balance Manager (wallet prompt)...");
 
-            const deep = (deepWithMgr as any)?.deepbook;
-            const bm = deep?.balanceManager;
-            const registerFn = pickRegisterBM(deep, bm);
-
-            if (!registerFn) {
-                throw new Error(
-                    `SDK mismatch: registerBalanceManager not found. deep keys: ${Object.keys(deep ?? {}).join(", ")}`
-                );
-            }
-
-            const tx = new Transaction();
-            // Docs: registerBalanceManager(managerKey) :contentReference[oaicite:3]{index=3}
-            tx.add(registerFn(MANAGER_KEY));
-
-            const res = await dAppKit.signAndExecuteTransaction({
-                transaction: tx,
-                options: { showEffects: true },
-            });
-
-            console.log("[TradingAccount] register res:", res);
-
-            setStatus("Registered. Refreshing...");
-            await refreshManagers();
-            setStatus("Registered.");
-        } finally {
-            setBusy(false);
-        }
-    }
-
-    async function createAndRegister() {
-        // Two txs (create must exist on-chain before registry lookup).
-        await createTradingAccount();
-        await new Promise((r) => setTimeout(r, 250));
-        await registerManager();
-    }
-
-    async function depositSui(amountSui: number) {
-        if (!account || !deepWithMgr || !displayManagerId) return;
-
-        setBusy(true);
-        try {
-            setStatus("Depositing SUI (wallet will prompt)...");
+            // Ensure mapping exists for MANAGER_KEY during register call
+            const deepWithMgr = client.$extend(
+                deepbook({
+                    address: account.address,
+                    network,
+                    balanceManagers: { [MANAGER_KEY]: { address: id } },
+                }),
+            );
 
             const deep = (deepWithMgr as any).deepbook;
             const bm = deep?.balanceManager;
 
-            if (typeof bm?.depositIntoManager !== "function") {
-                throw new Error("SDK mismatch: depositIntoManager not found.");
+            const registerFn = pickRegisterBM(deep, bm);
+            if (!registerFn) {
+                throw new Error(
+                    `SDK mismatch: registerBalanceManager not found. deep keys: ${Object.keys(
+                        deep ?? {},
+                    ).join(", ")}`,
+                );
             }
 
-            // Docs: depositIntoManager(managerKey, coinKey, amount:number) :contentReference[oaicite:4]{index=4}
             const tx = new Transaction();
-            tx.add(bm.depositIntoManager(MANAGER_KEY, "SUI", amountSui));
+            // DeepBook SDK pattern: registerBalanceManager(key)(tx) :contentReference[oaicite:4]{index=4}
+            applyTx(tx, registerFn(MANAGER_KEY));
 
-            await dAppKit.signAndExecuteTransaction({
-                transaction: tx,
-                options: { showEffects: true },
-            });
+            await dAppKit.signAndExecuteTransaction({ transaction: tx });
 
-            setStatus("Deposit complete.");
+            setStatus("Registered. Reload your page or re-open the Trade screen.");
         } finally {
             setBusy(false);
         }
@@ -282,52 +225,46 @@ export function TradingAccount() {
         <Card>
             <CardHeader>
                 <CardTitle>Trading Account</CardTitle>
-                <CardDescription>DeepBook Balance Manager</CardDescription>
+                <CardDescription>Balance Manager (create + register)</CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-3">
-                <div className="text-xs break-all">
-                    <b>Registered managers (discoverable):</b>{" "}
-                    {managerIds.length ? managerIds.join(", ") : "(none)"}
-                </div>
-
                 <div className="text-sm space-y-1">
-                    <div><b>Network:</b> {network}</div>
-                    <div className="break-all"><b>Manager:</b> {displayManagerId ?? "(none)"}</div>
-
-                    {hasRegisteredManager ? (
-                        <div className="text-muted-foreground">Trading account already exists for this wallet.</div>
-                    ) : displayManagerId ? (
-                        <div className="text-muted-foreground">Manager created locally but not registered yet.</div>
-                    ) : null}
+                    <div>
+                        <b>Network:</b> {network}
+                    </div>
+                    <div className="break-all">
+                        <b>Registered managers:</b>{" "}
+                        {managerIds.length ? managerIds.join(", ") : "(none)"}
+                    </div>
+                    <div className="break-all">
+                        <b>Local manager:</b> {displayManagerId ?? "(none)"}
+                    </div>
                 </div>
 
-                {!hasRegisteredManager && !displayManagerId ? (
-                    <div className="flex flex-wrap gap-2">
-                        <button className="px-3 py-2 rounded-md border" disabled={busy} onClick={createTradingAccount}>
-                            Create Trading Account
-                        </button>
-
-                        <button
-                            className="px-3 py-2 rounded-md border"
-                            disabled={busy}
-                            onClick={createAndRegister}
-                            title="Sends two transactions: create then register"
-                        >
-                            Create & Register
-                        </button>
+                {hasRegistered ? (
+                    <div className="text-sm text-muted-foreground">
+                        Trading account already exists for this wallet.
                     </div>
                 ) : (
                     <div className="flex flex-wrap gap-2">
-                        {!hasRegisteredManager ? (
-                            <button className="px-3 py-2 rounded-md border" disabled={busy} onClick={registerManager}>
-                                Register
+                        {!displayManagerId ? (
+                            <button
+                                className="px-3 py-2 rounded-md border"
+                                disabled={busy}
+                                onClick={createTradingAccount}
+                            >
+                                Create Trading Account
                             </button>
-                        ) : null}
-
-                        <button className="px-3 py-2 rounded-md border" disabled={busy} onClick={() => depositSui(0.1)}>
-                            Deposit 0.1 SUI
-                        </button>
+                        ) : (
+                            <button
+                                className="px-3 py-2 rounded-md border"
+                                disabled={busy}
+                                onClick={registerTradingAccount}
+                            >
+                                Register Trading Account
+                            </button>
+                        )}
                     </div>
                 )}
 

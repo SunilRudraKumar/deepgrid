@@ -12,9 +12,12 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "bot:gen": "node --import tsx/esm src/steps/03_generateBotKey.ts",
-    "bot:fund": "node --import tsx/esm src/steps/04_fundBotGas.ts",
-    "tradecap:mint": "node --import tsx/esm src/steps/05_mintTradeCap.ts",
+    "bot:gen": "node --import tsx/esm src/steps/04_generateBotKey.ts",
+    "bot:fund": "node --import tsx/esm src/steps/08_fundBotGas.ts",
+    "tradecap:mint": "node --import tsx/esm src/steps/09_mintTradeCap.ts",
+    "trade:smoke": "node --import tsx/esm src/steps/10_smokeMarket.ts",
+    "grid:run": "node --import tsx/esm src/steps/20_runPionexAnchoredGrid.ts",
+    "deposit": "node --import tsx/esm src/steps/06_depositToManager.ts",
     "mid": "node --import tsx/esm src/steps/01_midPrice.ts",
     "pools": "node --import tsx/esm src/steps/00_listPools.ts",
     "managers": "node --import tsx/esm src/steps/02_listManagers.ts",

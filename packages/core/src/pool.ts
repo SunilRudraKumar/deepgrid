@@ -1,5 +1,4 @@
-
-import { get } from './env';
+import { opt } from './env';
 
 export type PoolCoins = {
     poolKey: string;
@@ -14,11 +13,11 @@ export type PoolCoins = {
  * - overrides exist for mainnet/prod cases where naming differs
  */
 export function resolvePoolCoins(args?: { poolKey?: string }): PoolCoins {
-    const poolKey = args?.poolKey ?? get('DEEPBOOK_POOL_KEY') ?? 'SUI_DBUSDC';
+    const poolKey = args?.poolKey ?? opt('DEEPBOOK_POOL_KEY') ?? 'SUI_DBUSDC';
 
     // Optional overrides (recommended for production safety)
-    const baseOverride = get('BASE_COIN_KEY');
-    const quoteOverride = get('QUOTE_COIN_KEY');
+    const baseOverride = opt('BASE_COIN_KEY');
+    const quoteOverride = opt('QUOTE_COIN_KEY');
     if (baseOverride && quoteOverride) {
         return { poolKey, baseCoinKey: baseOverride, quoteCoinKey: quoteOverride };
     }

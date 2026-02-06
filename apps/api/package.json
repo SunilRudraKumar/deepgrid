@@ -1,0 +1,20 @@
+{
+    "name": "@deepgrid/api",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "tsx watch src/server.ts",
+        "start": "node dist/index.js",
+        "build": "tsc -p tsconfig.json"
+    },
+    "dependencies": {
+        "@deepgrid/core": "workspace:*",
+        "@fastify/cors": "^11.2.0",
+        "fastify": "^5.7.4",
+        "zod": "^3.25.76"
+    },
+    "devDependencies": {
+        "tsx": "^4.0.0",
+        "typescript": "^5.0.0"
+    }
+}

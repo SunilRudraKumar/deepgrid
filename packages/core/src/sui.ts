@@ -7,6 +7,9 @@ import { opt } from './env';
 
 export type Net = 'testnet' | 'mainnet';
 
+export const SUI_COIN_TYPE =
+  '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI';
+
 export function fullnodeUrl(net: Net): string {
   return net === 'mainnet'
     ? 'https://fullnode.mainnet.sui.io:443'
@@ -17,6 +20,41 @@ export function keypairFromSuiPrivKey(pk: string): Ed25519Keypair {
   const { scheme, secretKey } = decodeSuiPrivateKey(pk);
   if (scheme !== 'ED25519') throw new Error(`Unsupported scheme: ${scheme}`);
   return Ed25519Keypair.fromSecretKey(secretKey);
+}
+
+export function suiToMist(amount: number | string): bigint {
+  const s = String(amount).trim();
+  if (!/^\d+(\.\d+)?$/.test(s)) throw new Error(`Invalid SUI amount: ${amount}`);
+  const [w, fRaw = ''] = s.split('.');
+  const f = (fRaw + '000000000').slice(0, 9); // 9 decimals
+  return BigInt(w) * 1_000_000_000n + BigInt(f);
+}
+
+export function mistToSui(mist: bigint): number {
+  // ok for display/logging
+  return Number(mist) / 1e9;
+}
+
+function extractBalanceMist(resp: any): bigint {
+  // Handles grpc shapes that vary across versions
+  const cands = [
+    resp?.balance,
+    resp?.totalBalance,
+    resp?.coinBalance,
+    resp?.addressBalance,
+    resp?.balance?.balance,
+    resp?.balance?.coinBalance,
+    resp?.balance?.totalBalance,
+  ];
+  for (const c of cands) {
+    if (typeof c === 'string' && c.length) return BigInt(c);
+  }
+  return 0n;
+}
+
+export async function getGasMist(client: any, owner: string): Promise<bigint> {
+  const r = await client.core.getBalance({ owner, coinType: SUI_COIN_TYPE });
+  return extractBalanceMist(r);
 }
 
 export function poolKeyFromEnv(fallback = 'SUI_DBUSDC'): string {

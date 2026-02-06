@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mysten/dapp-kit": "^1.0.1",
     "@mysten/dapp-kit-react": "^1.0.1",
     "@mysten/deepbook-v3": "1.0.3",
     "@mysten/sui": "^2.3.0",
