@@ -22,8 +22,8 @@ export default function BotPageClient({ botName, botStatus, balanceManagerId }: 
     const pool = selectedPool?.id ?? 'SUI_USDC';
     const network: DeepbookNetwork = (process.env.NEXT_PUBLIC_SUI_NETWORK ?? 'mainnet') as DeepbookNetwork;
 
-    // Grid bot account and trade cap
-    const botAccount = useGridBotAccount();
+    // Grid bot account and trade cap - pass explicit manager ID from DB
+    const botAccount = useGridBotAccount({ explicitManagerId: balanceManagerId });
     const tradeCap = useMintTradeCap();
 
     // Grid configuration

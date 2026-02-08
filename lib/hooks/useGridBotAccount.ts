@@ -40,13 +40,19 @@ interface UseGridBotAccountReturn {
     refreshBalances: () => Promise<void>;
 }
 
-export function useGridBotAccount(): UseGridBotAccountReturn {
+interface UseGridBotAccountOptions {
+    /** If provided, use this manager ID directly instead of discovering from wallet */
+    explicitManagerId?: string;
+}
+
+export function useGridBotAccount(options: UseGridBotAccountOptions = {}): UseGridBotAccountReturn {
+    const { explicitManagerId } = options;
     const account = useCurrentAccount();
     const dAppKit = useDAppKit();
 
     const [status, setStatus] = useState<BotAccountStatus>('disconnected');
-    const [accountId, setAccountId] = useState<string | null>(null);
-    const [accountIds, setAccountIds] = useState<string[]>([]);
+    const [accountId, setAccountId] = useState<string | null>(explicitManagerId ?? null);
+    const [accountIds, setAccountIds] = useState<string[]>(explicitManagerId ? [explicitManagerId] : []);
     const [tradeCapId, setTradeCapId] = useState<string | null>(null);
     const [tradeCapIds, setTradeCapIds] = useState<string[]>([]);
     const [balances, setBalances] = useState<BalanceResult[]>([]);
@@ -80,11 +86,24 @@ export function useGridBotAccount(): UseGridBotAccountReturn {
 
         try {
             // 1. Check Balance Manager
-            const result = await checkTradingAccount(account.address, network);
+            // If explicitManagerId is provided, use it directly
+            let managerId: string | null = null;
+            let discoveredIds: string[] = [];
 
-            if (result.exists && result.accountIds?.length) {
-                const managerId = result.accountIds[0];
-                setAccountIds(result.accountIds);
+            if (explicitManagerId) {
+                managerId = explicitManagerId;
+                discoveredIds = [explicitManagerId];
+                console.log(LOG_PREFIX, 'Using explicit manager ID:', managerId);
+            } else {
+                const result = await checkTradingAccount(account.address, network);
+                if (result.exists && result.accountIds?.length) {
+                    managerId = result.accountIds[0];
+                    discoveredIds = result.accountIds;
+                }
+            }
+
+            if (managerId) {
+                setAccountIds(discoveredIds);
                 setAccountId(managerId);
 
                 // 2. Check TradeCap for this manager
