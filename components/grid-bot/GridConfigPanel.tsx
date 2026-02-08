@@ -23,12 +23,14 @@ export default function GridConfigPanel({
 }: GridConfigPanelProps) {
     const hasSufficientFunds = (() => {
         if (!requiredFunds || !availableFunds) return true; // Skip check if data missing
-        // Use a small epsilon for float comparison
-        const epsilon = 0.0001;
-        return (
-            availableFunds.base >= requiredFunds.base - epsilon &&
-            availableFunds.quote >= requiredFunds.quote - epsilon
-        );
+        // Use a small epsilon for float comparison, and handle the case where required is very close to available
+        // We use 0.001 as epsilon to be safe with UI display rounding
+        const epsilon = 0.001;
+
+        const hasBase = availableFunds.base >= requiredFunds.base - epsilon;
+        const hasQuote = availableFunds.quote >= requiredFunds.quote - epsilon;
+
+        return hasBase && hasQuote;
     })();
     return (
         <div className="rounded-lg border border-white/10 bg-[#0f141b] overflow-hidden">

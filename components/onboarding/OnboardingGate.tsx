@@ -97,6 +97,7 @@ export default function OnboardingGate() {
 
     return (
         <OnboardingPanel
+            managerId={managerId}
             state={state}
             onSetState={setState}
             onCreateAccount={handleCreateAccount}
@@ -104,7 +105,7 @@ export default function OnboardingGate() {
             envLabel={account ? 'Connected' : (process.env.NEXT_PUBLIC_SUI_NETWORK || 'Testnet')}
             balances={balances}
             onRefreshBalances={() => managerId && fetchBalances(managerId)}
-            managerId={managerId}
+
         />
     );
 }

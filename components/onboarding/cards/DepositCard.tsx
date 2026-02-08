@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import WithdrawCard from './WithdrawCard';
+import { useGridBotAccount } from '@/lib/hooks/useGridBotAccount';
 import { useWalletBalances } from '@/lib/hooks/useWalletBalances';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { buildDepositTransaction } from '@/lib/features/deepbook/deposit';
@@ -17,7 +19,13 @@ export default function DepositCard({
     onSuccess: () => void;
     onBack: () => void;
 }) {
-    const { data: walletBalances, isLoading } = useWalletBalances();
+    const [mode, setMode] = React.useState<'deposit' | 'withdraw'>('deposit');
+    const { data: walletBalances, isLoading } = useWalletBalances(); // For deposits (Wallet -> Manager)
+    const botAccount = useGridBotAccount({ explicitManagerId: managerId || undefined }); // For withdrawals (Manager -> Wallet)
+
+    // For withdrawal, we use bot balances
+    const managerBalances = botAccount.balances;
+
     const account = useCurrentAccount();
     const dAppKit = useDAppKit();
 
@@ -28,7 +36,48 @@ export default function DepositCard({
 
     const network = process.env.NEXT_PUBLIC_SUI_NETWORK || 'testnet';
 
-    // Find balance for selected asset
+    // Toggle UI
+    const toggleUI = (
+        <div className="flex justify-center mb-6">
+            <div className="bg-[#0b0f14] p-1 rounded-lg flex border border-white/5">
+                <button
+                    onClick={() => setMode('deposit')}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${mode === 'deposit'
+                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    Deposit
+                </button>
+                <button
+                    onClick={() => setMode('withdraw')}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${mode === 'withdraw'
+                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    Withdraw
+                </button>
+            </div>
+        </div>
+    );
+
+    // Render Withdraw Card if mode is withdraw
+    if (mode === 'withdraw' && managerId) {
+        return (
+            <div>
+                {toggleUI}
+                <WithdrawCard
+                    managerId={managerId}
+                    availableBalances={managerBalances}
+                    onSuccess={onSuccess}
+                    onBack={onBack}
+                />
+            </div>
+        );
+    }
+
+    // Find balance for selected asset (Wallet Balance for Deposit)
     const selectedBalance = walletBalances?.find(b => b.coinKey === asset);
     const available = selectedBalance?.availableBalance || 0;
 
@@ -61,8 +110,8 @@ export default function DepositCard({
                 walletAddress: account.address,
                 managerId,
                 coinKey: asset,
-                amount: Number(amount),
-                network,
+                amount: parseFloat(amount),
+                network: network as any, // Cast to avoid type mismatch
             });
 
             console.log(`[DepositCard] Requesting wallet signature...`);
@@ -92,8 +141,9 @@ export default function DepositCard({
 
     return (
         <div className="rounded-lg border border-white/5 bg-black/20 p-4">
-            <div className="text-sm font-semibold text-zinc-100">Deposit Funds</div>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
+            {managerId && toggleUI}
+            <div className="text-sm font-semibold text-zinc-100 mb-2">Deposit Funds</div>
+            <p className="text-sm text-zinc-400 mb-4 leading-relaxed">
                 Move funds from your wallet into the trading account.
             </p>
 
