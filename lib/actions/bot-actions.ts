@@ -92,16 +92,23 @@ export async function updateBotConfig(id: string, config: any) {
  * Returns the first bot of that type, or null if none exists
  */
 export async function getBotByType(ownerAddress: string, type: 'GRID' | 'DCA') {
+    console.log(`[getBotByType] Called for ${ownerAddress} type ${type}`);
+
     if (!ownerAddress) return null;
 
-    const bot = await prisma.bot.findFirst({
-        where: {
-            ownerAddress,
-            type
-        },
-        orderBy: { createdAt: 'desc' },
-    });
-
-    return bot;
+    try {
+        const bot = await prisma.bot.findFirst({
+            where: {
+                ownerAddress,
+                type
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        console.log(`[getBotByType] Result:`, bot ? bot.id : 'null');
+        return bot;
+    } catch (e) {
+        console.error(`[getBotByType] Error:`, e);
+        throw e;
+    }
 }
 
