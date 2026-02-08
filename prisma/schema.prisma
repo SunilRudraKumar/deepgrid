@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  address   String   @id // Wallet address
+  createdAt DateTime @default(now())
+  
+  bots      Bot[]
+}
+
+model Bot {
+  id              String   @id @default(uuid())
+  name            String
+  type            String   // "GRID", "DCA"
+  
+  // On-Chain Identity
+  balanceManagerId String  @unique // On-chain ID
+  tradeCapId      String?  // On-chain Cap ID (if stored)
+  network         String   @default("mainnet")
+
+  // Configuration (flexible JSON)
+  config          String?  // Stored as serialized JSON
+  
+  // Status
+  status          String   @default("ACTIVE") // ACTIVE, PAUSED, STOPPED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Ownership
+  ownerAddress    String
+  owner           User     @relation(fields: [ownerAddress], references: [address])
+
+  trades          Trade[]
+
+  @@index([ownerAddress])
+}
+
+model Trade {
+  id              String   @id @default(uuid())
+  botId           String
+  bot             Bot      @relation(fields: [botId], references: [id])
+  
+  txDigest        String
+  pair            String   // e.g. SUI_USDC
+  side            String   // BUY, SELL
+  amount          String    // serialized BigInt
+  price           Float
+  timestamp       DateTime @default(now())
+}

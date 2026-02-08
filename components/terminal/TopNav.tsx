@@ -39,6 +39,9 @@ export default function TopNav() {
                     <NavLink href="/spot" active={pathname?.startsWith('/spot')}>
                         Spot
                     </NavLink>
+                    <NavLink href="/bots" active={pathname?.startsWith('/bots')}>
+                        Bots
+                    </NavLink>
                     <NavLink href="/portfolio" active={pathname?.startsWith('/portfolio')}>
                         Portfolio
                     </NavLink>

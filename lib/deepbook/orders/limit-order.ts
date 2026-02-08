@@ -26,6 +26,7 @@ const MAX_U64 = BigInt('18446744073709551615');
 export interface BuildLimitOrderParams {
     walletAddress: string;
     managerId: string;
+    tradeCapId?: string; // Optional: If provided, use TradeCap for authorization
     poolKey: string;
     quantity: number;
     price: number;
@@ -36,6 +37,7 @@ export interface BuildLimitOrderParams {
     clientOrderId?: number;
     payWithDeep?: boolean;
     network?: Network;
+    tx?: Transaction; // Optional: Use existing transaction builder (for batching)
 }
 
 /**
@@ -48,6 +50,7 @@ export async function buildLimitOrderTransaction(
     const {
         walletAddress,
         managerId,
+        tradeCapId,
         poolKey,
         quantity,
         price,
@@ -58,7 +61,10 @@ export async function buildLimitOrderTransaction(
         clientOrderId = Date.now(),
         payWithDeep = false,
         network = 'mainnet',
+        tx: existingTx,
     } = params;
+
+    // ... (logging and validation logic remains the same) ...
 
     console.log(`📝 [Limit] ${side.toUpperCase()} ${quantity} @ ${price} on ${poolKey}`);
 
@@ -105,6 +111,7 @@ export async function buildLimitOrderTransaction(
         aligned: inputQuantity === rawQuantity ? 'yes' : `rounded from ${rawQuantity}`,
         orderType,
         payWithDeep,
+        usingTradeCap: !!tradeCapId,
     });
 
     // Map order type string to u8
@@ -119,13 +126,27 @@ export async function buildLimitOrderTransaction(
     // Expiration: 0 means use MAX_U64 (no expiration)
     const expiration = expireTimestamp === 0 ? MAX_U64 : BigInt(expireTimestamp);
 
-    const tx = new Transaction();
+    // Use passed transaction or create new one
+    const tx = existingTx || new Transaction();
 
-    // Step 1: Generate trade proof as owner
-    const tradeProof = tx.moveCall({
-        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
-        arguments: [tx.object(managerId)],
-    });
+    // Step 1: Generate trade proof
+    let tradeProof;
+    if (tradeCapId) {
+        // Use TradeCap if provided (Grid Bot mode)
+        tradeProof = tx.moveCall({
+            target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_trader`,
+            arguments: [
+                tx.object(managerId),
+                tx.object(tradeCapId)
+            ],
+        });
+    } else {
+        // Default to Owner mode (Manual Trading mode)
+        tradeProof = tx.moveCall({
+            target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
+            arguments: [tx.object(managerId)],
+        });
+    }
 
     // Step 2: Place limit order
     // Signature: place_limit_order<BASE, QUOTE>(

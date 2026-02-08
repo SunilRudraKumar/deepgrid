@@ -145,11 +145,18 @@ export async function fetchAllOpenOrders(
 /**
  * Fetch details for a specific order using pool::get_order
  */
+import { OrderStruct } from '../bcs-structs';
+import { microToPrice } from '@/lib/grid-bot';
+
+// ... (other imports)
+
+// ... (fetchOpenOrderIds implementation)
+
 export async function fetchOrderDetails(
     orderId: string,
     poolKey: string,
     network: Network = 'mainnet'
-): Promise<{ price: number; quantity: number; side: 'buy' | 'sell'; filled: number } | null> {
+): Promise<{ price: number; quantity: number; side: 'buy' | 'sell'; filled: number; orderId: string } | null> {
     const packageIds = network === 'mainnet' ? mainnetPackageIds : testnetPackageIds;
     const coins = network === 'mainnet' ? mainnetCoins : testnetCoins;
     const poolConfig = POOL_CONFIG[network]?.[poolKey];
@@ -191,25 +198,43 @@ export async function fetchOrderDetails(
             return null;
         }
 
-        console.log('📋 [OrderDetails] Raw BCS bytes:', bytes);
+        console.log(`📋 [OrderDetails] Got ${bytes.length} bytes for ${orderId}`);
+        // console.log('📋 [OrderDetails] Raw BCS bytes:', bytes);
 
-        // The Order struct has fields like:
-        // - order_id: u128
-        // - client_order_id: u64  
-        // - price: u64
-        // - original_quantity: u64
-        // - quantity: u64
-        // - filled_quantity: u64
-        // - is_bid: bool
-        // ... etc
-        // For now, return placeholder until we decode the struct properly
+        // Decode BCS using correct struct
+        const data = new Uint8Array(bytes);
+        try {
+            const order = OrderStruct.parse(data);
+            console.log('📋 [OrderDetails] Parsed order:', order);
 
-        return {
-            price: 0.5, // Placeholder - need to decode struct
-            quantity: 1.0,
-            side: 'buy',
-            filled: 0,
-        };
+            // Extract Price and Side from Order ID (u128)
+            // Bid: 0 for 1st bit, 0 for next 63 bits (price), 1 for next 64 bits order_id
+            // Ask: 1 for 1st bit, 0 for next 63 bits (price), 0 for next 64 bits order_id
+
+            const rawOrderId = BigInt(order.order_id);
+            const isBid = (rawOrderId >> BigInt(127)) === BigInt(0); // MSB is 0 for Bid, 1 for Ask
+
+            // Price is in bits 64-126 (63 bits)
+            // Mask: (rawOrderId >> 64n) & ((1n << 63n) - 1n)
+            const rawPrice = (rawOrderId >> BigInt(64)) & BigInt("0x7FFFFFFFFFFFFFFF");
+
+            const price = Number(rawPrice) / quoteCoin.scalar;
+            const quantity = Number(order.quantity) / baseCoin.scalar;
+            const filled = Number(order.filled_quantity) / baseCoin.scalar;
+            const totalOriginal = quantity + filled;
+
+            return {
+                orderId,
+                price,
+                quantity: totalOriginal, // Show original size
+                side: isBid ? 'buy' : 'sell',
+                filled,
+            };
+        } catch (parseError) {
+            console.error('📋 [OrderDetails] Parsing failed:', parseError);
+            return null;
+        }
+
     } catch (error) {
         console.error('📋 [OrderDetails] Failed to fetch:', error);
         return null;

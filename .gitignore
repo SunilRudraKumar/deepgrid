@@ -43,3 +43,6 @@ legacy-temp/
 .agent/
 apps/
 packages/
+docs/
+*.db
+tsconfig.base.json
