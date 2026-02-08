@@ -27,7 +27,7 @@ interface UseMintTradeCapReturn {
     isChecking: boolean;
     hasTradeCap: boolean;
     mintTradeCap: (balanceManagerId: string) => Promise<string | null>;
-    checkTradeCaps: () => Promise<void>;
+    checkTradeCaps: (balanceManagerId?: string) => Promise<void>;
     reset: () => void;
 }
 
