@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import TopNav from '@/components/terminal/TopNav';
 import GridConfigPanel from '@/components/grid-bot/GridConfigPanel';
 import GridActiveOrders from '../grid-bot/GridActiveOrders';
 import SwapCard from './cards/SwapCard';
@@ -13,6 +14,9 @@ import { useTradeOrder } from '@/lib/hooks/useTradeOrder';
 import { usePoolSelector } from '@/lib/context/PoolSelectorContext';
 import { type DeepbookNetwork, getSummary } from '@/lib/deepbook/indexer';
 import { usePolling } from '@/lib/hooks/usePolling';
+import { Transaction } from '@mysten/sui/transactions';
+import { buildLimitOrderTransaction } from '@/lib/deepbook/orders/limit-order';
+import { useDAppKit, useCurrentAccount } from '@mysten/dapp-kit-react';
 
 interface BotPageClientProps {
     botName: string;
@@ -29,6 +33,8 @@ export default function BotPageClient({ botName, botStatus, balanceManagerId }: 
     const botAccount = useGridBotAccount({ explicitManagerId: balanceManagerId });
     const tradeCap = useMintTradeCap({ explicitManagerId: balanceManagerId });
     const { placeMarketOrder, isLoading: isTrading } = useTradeOrder({ managerId: balanceManagerId, network });
+    const { signAndExecuteTransaction } = useDAppKit();
+    const account = useCurrentAccount();
 
     // Grid configuration
     const gridConfig = useGridConfig({
@@ -85,10 +91,151 @@ export default function BotPageClient({ botName, botStatus, balanceManagerId }: 
     const needsTradeCap = !tradeCap.hasTradeCap && !tradeCap.isChecking;
     const isMintingTradeCap = tradeCap.status === 'building' || tradeCap.status === 'signing' || tradeCap.status === 'confirming';
 
-    // Handle Create Bot
+    // Handle Create Bot (Start Grid)
     const handleCreateBot = async () => {
-        console.log('Create Bot clicked', gridConfig.config);
-        // TODO: Implement bot creation logic (save to DB, start worker, etc.)
+        console.log('[BotPageClient] Starting Grid with config:', gridConfig.orders);
+
+        if (!botAccount.accountId || !tradeCap.tradeCapId) {
+            console.error('[BotPageClient] Bot account or TradeCap missing');
+            return;
+        }
+
+        if (gridConfig.orders.length === 0) {
+            console.warn('[BotPageClient] No orders to place');
+            alert('No orders calculated. Please check your price range.');
+            return;
+        }
+
+        try {
+            // --- 1. Pre-check: Calculate required funds ---
+            const orders = gridConfig.orders;
+            const requiredBase = orders.filter(o => o.side === 'SELL').reduce((sum, o) => sum + o.size, 0);
+            const requiredQuote = orders.filter(o => o.side === 'BUY').reduce((sum, o) => sum + (o.size * o.price), 0);
+
+            // Get current balances from botAccount
+            const baseBalance = botAccount.balances.find(b => b.coinKey === 'SUI')?.balance ?? 0;
+            const quoteBalance = botAccount.balances.find(b => b.coinKey === 'USDC')?.balance ?? 0;
+
+            console.log(`[BotPageClient] Required: ${requiredBase.toFixed(4)} SUI, ${requiredQuote.toFixed(4)} USDC`);
+            console.log(`[BotPageClient] Available: ${baseBalance.toFixed(4)} SUI, ${quoteBalance.toFixed(4)} USDC`);
+
+            if (baseBalance < requiredBase || quoteBalance < requiredQuote) {
+                // Auto-Swap Logic
+                // Use currentPrice (midPrice) for conversion
+                const midPrice = currentPrice || gridConfig.config.min; // Fallback
+
+                const buffer = 1.02; // 2% buffer
+                const baseDeficit = Math.max(0, requiredBase - baseBalance);
+                const quoteDeficit = Math.max(0, requiredQuote - quoteBalance);
+
+                // Value in USDC
+                const deficitValue = (baseDeficit * midPrice) + quoteDeficit;
+                const baseSurplus = Math.max(0, baseBalance - requiredBase);
+                const quoteSurplus = Math.max(0, quoteBalance - requiredQuote);
+                const surplusValue = (baseSurplus * midPrice) + quoteSurplus;
+
+                if (surplusValue > deficitValue * buffer) {
+                    const confirmSwap = window.confirm(
+                        `Insufficient specific balances, but you have enough total value.\n\n` +
+                        `Required: ${requiredBase.toFixed(4)} SUI + ${requiredQuote.toFixed(4)} USDC\n` +
+                        `Missing: ${baseDeficit > 0 ? baseDeficit.toFixed(4) + ' SUI' : ''} ${quoteDeficit > 0 ? quoteDeficit.toFixed(4) + ' USDC' : ''}\n\n` +
+                        `Click OK to AUTO-SWAP and start the bot in one transaction.`
+                    );
+
+                    if (!confirmSwap) return;
+                } else {
+                    const missing = [];
+                    if (baseBalance < requiredBase) missing.push(`${(requiredBase - baseBalance).toFixed(4)} SUI`);
+                    if (quoteBalance < requiredQuote) missing.push(`${(requiredQuote - quoteBalance).toFixed(4)} USDC`);
+
+                    alert(`Insufficient funds. Missing: ${missing.join(', ')}. Please deposit or swap funds.`);
+                    return;
+                }
+            }
+
+            console.log(`[BotPageClient] Building transaction...`);
+            const tx = new Transaction();
+
+            // --- 1.5 Auto-Swap Injection ---
+            if (baseBalance < requiredBase || quoteBalance < requiredQuote) {
+                const midPrice = currentPrice || gridConfig.config.min;
+                const baseDeficit = Math.max(0, requiredBase - baseBalance);
+                const quoteDeficit = Math.max(0, requiredQuote - quoteBalance);
+
+                if (baseDeficit > 0) {
+                    console.log(`[BotPageClient] Auto-swapping for ${baseDeficit.toFixed(4)} SUI...`);
+                    const { buildMarketOrderTransaction } = await import('@/lib/deepbook/orders/market-order');
+                    await buildMarketOrderTransaction({
+                        walletAddress: account?.address ?? '',
+                        managerId: botAccount.accountId,
+                        poolKey: pool,
+                        quantity: baseDeficit * 1.01,
+                        side: 'buy',
+                        network: network,
+                        tx,
+                    });
+                }
+
+                if (quoteDeficit > 0) {
+                    const suiToSell = (quoteDeficit / midPrice) * 1.01;
+                    console.log(`[BotPageClient] Auto-swapping ${suiToSell.toFixed(4)} SUI for USDC...`);
+                    const { buildMarketOrderTransaction } = await import('@/lib/deepbook/orders/market-order');
+                    await buildMarketOrderTransaction({
+                        walletAddress: account?.address ?? '',
+                        managerId: botAccount.accountId,
+                        poolKey: pool,
+                        quantity: suiToSell,
+                        side: 'sell',
+                        network: network,
+                        tx,
+                    });
+                }
+            }
+
+            // --- 2. Build Grid Orders ---
+            let validOrdersCount = 0;
+            for (const order of gridConfig.orders) {
+                try {
+                    await buildLimitOrderTransaction({
+                        walletAddress: account?.address ?? '',
+                        managerId: botAccount.accountId,
+                        tradeCapId: tradeCap.tradeCapId,
+                        poolKey: pool,
+                        quantity: order.size,
+                        price: order.price,
+                        side: order.side.toLowerCase() as 'buy' | 'sell',
+                        orderType: 'post_only',
+                        network: network,
+                        tx,
+                    });
+                    validOrdersCount++;
+                } catch (e: any) {
+                    if (e.message?.includes('Order too small')) {
+                        continue;
+                    }
+                    console.error(`[BotPageClient] Error building order:`, e);
+                }
+            }
+
+            if (validOrdersCount === 0) {
+                alert('No valid orders (too small?). Increase investment.');
+                return;
+            }
+
+            console.log(`[BotPageClient] Placing ${validOrdersCount} orders...`);
+
+            const result = await signAndExecuteTransaction({
+                transaction: tx,
+            });
+
+            console.log('[BotPageClient] Success:', result);
+            alert(`Successfully placed ${validOrdersCount} grid orders!`);
+            setTimeout(() => botAccount.checkAccount(), 2000);
+
+        } catch (error: any) {
+            console.error('[BotPageClient] Error:', error);
+            alert(`Error: ${error.message}`);
+        }
     };
 
     // Handle TradeCap minting
@@ -104,6 +251,11 @@ export default function BotPageClient({ botName, botStatus, balanceManagerId }: 
 
     return (
         <div className="container mx-auto px-4 py-6 space-y-6">
+
+            {/* Top Navigation */}
+            <div className="mb-6">
+                <TopNav />
+            </div>
 
             {/* Header */}
             <div className="flex justify-between items-center bg-[#0f141b] border border-white/10 p-6 rounded-xl">
@@ -136,7 +288,7 @@ export default function BotPageClient({ botName, botStatus, balanceManagerId }: 
                         <GridChartPanel
                             pool={pool}
                             network={network}
-                            gridPrices={gridPrices}
+                            gridOrders={gridConfig.orders}
                             levelCount={gridConfig.levels.length}
                         />
                     </div>

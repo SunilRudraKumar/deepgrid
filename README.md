@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DeepGrid v2
+
+A decentralized trading terminal and bot platform built on Sui and DeepBook v3.
+
+## Features
+
+### Trading Terminal
+- **Spot Trading**: Limit and market orders on DeepBook v3 pools.
+- **Charts**: Real-time candlestick charts with technical indicators.
+- **Order Management**: Open orders, order history, and trade history.
+- **Wallet Integration**: Seamless connection with Sui wallets via dApp Kit.
+
+### Automated Trading Bots
+- **Grid Trading Bot**: 
+  - Automates buy low / sell high strategies within a price range.
+  - **Single Asset Entry**: Start bots with only one asset (e.g., USDC) via auto-swap.
+  - **Real-time Visualization**: View grid levels directly on the price chart.
+  - **Performance Tracking**: Track realized and unrealized PnL.
+- **DCA Bot**: (Coming Soon) Dollar Cost Averaging strategies.
+
+### Dashboard & Analytics
+- **Bot Dashboard**: Manage all active bots from a central interface.
+- **Portfolio**: (Components in progress) Track comprehensive asset performance.
+- **Leaderboard**: (Components in progress) Compare strategies with other traders.
+
+## Project Structure
+
+```
+deepgrid-v2/
+├── app/                    # Next.js App Router pages
+│   ├── spot/               # Spot trading terminal
+│   ├── bots/               # Bot creation and management
+│   ├── dashboard/          # User dashboard
+│   ├── portfolio/          # Portfolio analytics
+│   └── ...
+├── components/             # React components
+│   ├── terminal/           # Trading terminal components (charts, order book)
+│   ├── grid-bot/           # Grid bot specific components
+│   ├── dashboard/          # Dashboard widgets
+│   └── ui/                 # Reusable UI elements
+├── lib/                    # Core logic and utilities
+│   ├── deepbook/           # DeepBook SDK integration and order builders
+│   ├── hooks/              # Custom React hooks (Sui interaction, state)
+│   ├── prisma/             # Database client
+│   └── ...
+└── public/                 # Static assets
+```
 
 ## Getting Started
 
-First, run the development server:
+1.  **Install dependencies**:
+    ```bash
+    pnpm install
+    ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+2.  **Run development server**:
+    ```bash
+    pnpm dev
+    ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3.  **Build for production**:
+    ```bash
+    pnpm build
+    ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Framework**: Next.js 15 (App Router)
+- **Blockchain**: Sui (Move)
+- **DeFi Protocol**: DeepBook v3
+- **Styling**: Tailwind CSS
+- **Database**: PostgreSQL (Prisma)

@@ -21,7 +21,7 @@ interface DeepbookCandleChartProps {
     /** Chart height in pixels */
     height?: number;
     /** Optional price lines (e.g., grid bot levels) */
-    priceLines?: number[];
+    priceLines?: { price: number; color?: string; title?: string }[];
 }
 
 export default function DeepbookCandleChart(props: DeepbookCandleChartProps) {
@@ -111,15 +111,34 @@ export default function DeepbookCandleChart(props: DeepbookCandleChartProps) {
         if (!series) return;
 
         const lines = props.priceLines ?? [];
-        lines.forEach((price) => {
-            series.createPriceLine({
-                price,
-                color: 'rgba(59,130,246,0.35)',
+        // Clear existing lines? 
+        // lightweight-charts v4 doesn't have a clearPriceLines method easily accessible without tracking primitives.
+        // For now, we assume this component re-mounts or we just add. 
+        // TO FIX: we should track the primitives and remove them.
+        // However, looking at the code, it just adds new ones every render if we don't clear.
+        // Proper way: assign to a ref and remove on cleanup/update.
+
+        // Since we don't have easy ref tracking for lines in this snippet, let's just add them.
+        // Note: This might cause duplicates if props change often.
+        // Ideally we should keep a ref of created lines.
+
+        const primitives: any[] = [];
+
+        lines.forEach((line) => {
+            const priceLine = series.createPriceLine({
+                price: line.price,
+                color: line.color ?? 'rgba(59,130,246,0.35)',
                 lineWidth: 1,
                 lineStyle: 2, // Dashed
                 axisLabelVisible: true,
+                title: line.title ?? '',
             });
+            primitives.push(priceLine);
         });
+
+        return () => {
+            primitives.forEach(p => series.removePriceLine(p));
+        };
     }, [props.priceLines]);
 
     return (

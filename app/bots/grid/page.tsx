@@ -145,18 +145,109 @@ function GridBotContent() {
             console.log(LOG_PREFIX, `Available: ${baseBalance.toFixed(4)} SUI, ${quoteBalance.toFixed(4)} USDC`);
 
             if (baseBalance < requiredBase || quoteBalance < requiredQuote) {
-                const missing = [];
-                if (baseBalance < requiredBase) missing.push(`${(requiredBase - baseBalance).toFixed(4)} SUI`);
-                if (quoteBalance < requiredQuote) missing.push(`${(requiredQuote - quoteBalance).toFixed(4)} USDC`);
+                // Check if we have enough TOTAL value to cover the difference (plus buffer)
+                // We use midPrice to convert deficits/surpluses
+                // midPrice is likely available in scope (from props or hook). 
+                // Wait, midPrice is defined in component scope.
 
-                alert(`Insufficient funds in Bot Account. Missing: ${missing.join(', ')}. Please deposit funds first.`);
-                return;
+                const buffer = 1.02; // 2% buffer for fees and slippage
+                const baseDeficit = Math.max(0, requiredBase - baseBalance);
+                const quoteDeficit = Math.max(0, requiredQuote - quoteBalance);
+
+                // Value of deficits in USDC
+                const deficitValue = (baseDeficit * midPrice) + quoteDeficit;
+
+                // Surplus assets
+                const baseSurplus = Math.max(0, baseBalance - requiredBase);
+                const quoteSurplus = Math.max(0, quoteBalance - requiredQuote);
+
+                // Value of surpluses in USDC
+                const surplusValue = (baseSurplus * midPrice) + quoteSurplus;
+
+                console.log(LOG_PREFIX, `Deficit Value: $${deficitValue.toFixed(2)}, Surplus Value: $${surplusValue.toFixed(2)}`);
+
+                if (surplusValue > deficitValue * buffer) {
+                    // We can auto-swap!
+                    const confirmSwap = window.confirm(
+                        `Insufficient specific balances, but you have enough total value.\n\n` +
+                        `Required: ${requiredBase.toFixed(4)} SUI + ${requiredQuote.toFixed(4)} USDC\n` +
+                        `Missing: ${baseDeficit > 0 ? baseDeficit.toFixed(4) + ' SUI' : ''} ${quoteDeficit > 0 ? quoteDeficit.toFixed(4) + ' USDC' : ''}\n\n` +
+                        `Click OK to AUTO-SWAP and create the bot in one transaction.`
+                    );
+
+                    if (!confirmSwap) return;
+
+                    // Proceed to build swap transaction
+                    // We inject the swap instructions into the SAME transaction block 'tx' used for orders.
+                    // This works because DeepBook settles to BalanceManager immediately.
+                } else {
+                    const missing = [];
+                    if (baseBalance < requiredBase) missing.push(`${(requiredBase - baseBalance).toFixed(4)} SUI`);
+                    if (quoteBalance < requiredQuote) missing.push(`${(requiredQuote - quoteBalance).toFixed(4)} USDC`);
+
+                    alert(`Insufficient funds in Bot Account. Missing: ${missing.join(', ')}. Please deposit funds first.`);
+                    return;
+                }
             }
 
             console.log(LOG_PREFIX, `Creating grid orders...`);
 
             // Initialize a single transaction block for batching
             const tx = new Transaction();
+
+            // --- 1.5 Auto-Swap Logic (if needed) ---
+            if (baseBalance < requiredBase || quoteBalance < requiredQuote) {
+                const baseDeficit = Math.max(0, requiredBase - baseBalance);
+                const quoteDeficit = Math.max(0, requiredQuote - quoteBalance);
+
+                if (baseDeficit > 0) {
+                    // Need SUI. Sell USDC (Quote) to Buy SUI (Base).
+                    // We need 'baseDeficit' SUI. 
+                    // DeepBook place_market_order handles quantity in Base or Quote?
+                    // Usually Market Buy specifies Quantity of Base Asset you want to buy (if happy with price).
+                    // Or specifies Quote Asset to spend. 
+                    // Let's check buildMarketOrderTransaction. 
+                    // It takes 'quantity'. market-order.ts says "Convert quantity to base units".
+                    // So input is Base Units.
+                    // So to buy X SUI, we pass X as quantity and side 'buy'.
+                    // We add a small buffer to the request? No, if we want exactly X SUI, we ask for X.
+                    // But we must have enough USDC to cover X * Price * Slippage.
+                    // We already checked surplusValue > deficitValue * 1.02.
+
+                    console.log(LOG_PREFIX, `Auto-swapping for ${baseDeficit.toFixed(4)} SUI...`);
+                    const { buildMarketOrderTransaction } = await import('@/lib/deepbook/orders/market-order'); // Dynamic import to avoid cycles/deps
+                    await buildMarketOrderTransaction({
+                        walletAddress: account?.address ?? '',
+                        managerId: botAccount.accountId,
+                        poolKey: pool,
+                        quantity: baseDeficit * 1.01, // Buy 1% extra to be safe
+                        side: 'buy',
+                        network: network as any,
+                        tx, // Append to same tx
+                    });
+                }
+
+                if (quoteDeficit > 0) {
+                    // Need USDC. Sell SUI (Base) to Buy USDC (Quote).
+                    // We need 'quoteDeficit' USDC.
+                    // We have surplus SUI.
+                    // How much SUI to sell to get Y USDC? Y / Price.
+                    const suiToSell = (quoteDeficit / midPrice) * 1.01; // Sell 1% extra SUI to be safe
+                    console.log(LOG_PREFIX, `Auto-swapping ${suiToSell.toFixed(4)} SUI for USDC...`);
+
+                    const { buildMarketOrderTransaction } = await import('@/lib/deepbook/orders/market-order'); // Dynamic import
+                    await buildMarketOrderTransaction({
+                        walletAddress: account?.address ?? '',
+                        managerId: botAccount.accountId,
+                        poolKey: pool,
+                        quantity: suiToSell,
+                        side: 'sell',
+                        network: network as any,
+                        tx, // Append to same tx
+                    });
+                }
+            }
+
             let validOrdersCount = 0;
 
             // --- 2. Build Orders ---
@@ -241,7 +332,7 @@ function GridBotContent() {
                     <GridChartPanel
                         pool={pool}
                         network={network}
-                        gridPrices={gridPrices}
+                        gridOrders={gridConfig.orders}
                         levelCount={gridConfig.levels.length}
                     />
 

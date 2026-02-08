@@ -28,7 +28,10 @@ export default function SwapCard({ managerId, onSuccess }: SwapCardProps) {
     const balance = botAccount.balances.find(b => b.coinKey === sourceAsset)?.balance || 0;
 
     const handleMax = () => {
-        setAmount(balance.toString());
+        if (!balance) return;
+        // Subtract 0.2% buffer for fees when using max
+        const maxAmount = balance * 0.998;
+        setAmount(maxAmount.toFixed(4));
     };
 
     const handleSwap = async () => {

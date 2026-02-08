@@ -22,6 +22,7 @@ export interface BuildMarketOrderParams {
     selfMatchingOption?: number;
     payWithDeep?: boolean;
     network?: Network;
+    tx?: Transaction; // Optional: Use existing transaction builder
 }
 
 /**
@@ -41,6 +42,7 @@ export async function buildMarketOrderTransaction(
         selfMatchingOption = SelfMatchingOptions.SELF_MATCHING_ALLOWED,
         payWithDeep = false,
         network = 'mainnet',
+        tx: existingTx,
     } = params;
 
     console.log(`📝 [Market] ${side.toUpperCase()} ${quantity} on ${poolKey}`);
@@ -88,7 +90,7 @@ export async function buildMarketOrderTransaction(
         payWithDeep,
     });
 
-    const tx = new Transaction();
+    const tx = existingTx || new Transaction();
 
     // Step 1: Generate trade proof as owner
     // This proves ownership of the balance manager

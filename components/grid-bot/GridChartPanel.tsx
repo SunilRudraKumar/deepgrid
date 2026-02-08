@@ -13,14 +13,16 @@ const DeepbookCandleChart = dynamic(
     { ssr: false, loading: () => <ChartSkeleton /> }
 );
 
+import { type GridOrder } from '@/lib/grid-bot';
+
 interface GridChartPanelProps {
     pool: string;
     network: DeepbookNetwork;
-    gridPrices: number[];
+    gridOrders: GridOrder[];
     levelCount: number;
 }
 
-export default function GridChartPanel({ pool, network, gridPrices, levelCount }: GridChartPanelProps) {
+export default function GridChartPanel({ pool, network, gridOrders, levelCount }: GridChartPanelProps) {
     const ohlcvPoll = usePolling(
         React.useCallback(
             () => getOhlcv({ network, pool, interval: '15m', limit: 300 }),
@@ -48,7 +50,11 @@ export default function GridChartPanel({ pool, network, gridPrices, levelCount }
                     <DeepbookCandleChart
                         candles={ohlcvPoll.data?.candles ?? []}
                         height={400}
-                        priceLines={gridPrices}
+                        priceLines={gridOrders.map(order => ({
+                            price: order.price,
+                            color: order.side === 'BUY' ? '#22c55e' : '#ef4444',
+                            title: order.side
+                        }))}
                     />
                 )}
             </div>

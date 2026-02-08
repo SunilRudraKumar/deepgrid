@@ -89,8 +89,17 @@ export default function GridConfigPanel({
                             </span>
                         </div>
                         {!hasSufficientFunds && (
-                            <div className="px-3 py-2 rounded bg-red-500/10 border border-red-500/30 text-[10px] text-red-400 leading-tight">
-                                Insufficient funds. You need USDC for buy orders and SUI for sell orders.
+                            <div className="px-3 py-2 rounded bg-red-500/10 border border-red-500/30 text-[10px] text-red-400 leading-tight space-y-1">
+                                <div>Insufficient funds for this strategy:</div>
+                                {availableFunds.base < requiredFunds.base && (
+                                    <div>• Missing {(requiredFunds.base - availableFunds.base).toFixed(4)} SUI</div>
+                                )}
+                                {availableFunds.quote < requiredFunds.quote && (
+                                    <div>• Missing {(requiredFunds.quote - availableFunds.quote).toFixed(4)} USDC</div>
+                                )}
+                                <div className="text-white/40 pt-1">
+                                    Tip: Use Quick Swap to rebalance your portfolio.
+                                </div>
                             </div>
                         )}
                     </div>
