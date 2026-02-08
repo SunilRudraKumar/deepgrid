@@ -86,3 +86,22 @@ export async function updateBotConfig(id: string, config: any) {
         return { success: false, error: 'Failed to update config' };
     }
 }
+
+/**
+ * Get a user's bot by type (GRID or DCA)
+ * Returns the first bot of that type, or null if none exists
+ */
+export async function getBotByType(ownerAddress: string, type: 'GRID' | 'DCA') {
+    if (!ownerAddress) return null;
+
+    const bot = await prisma.bot.findFirst({
+        where: {
+            ownerAddress,
+            type
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    return bot;
+}
+

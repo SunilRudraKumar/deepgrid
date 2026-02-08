@@ -7,13 +7,17 @@ import { createTradingAccountTransaction } from '@/lib/features/deepbook/create-
 import { checkTradingAccount } from '@/lib/features/onboarding/check-account';
 import { registerBot } from '@/lib/actions/bot-actions';
 
-export function CreateBotForm() {
+interface CreateBotFormProps {
+    defaultType?: 'GRID' | 'DCA';
+}
+
+export function CreateBotForm({ defaultType = 'GRID' }: CreateBotFormProps) {
     const router = useRouter();
     const account = useCurrentAccount();
     const dAppKit = useDAppKit();
 
     const [name, setName] = React.useState('');
-    const [type, setType] = React.useState<'GRID' | 'DCA'>('GRID');
+    const [type, setType] = React.useState<'GRID' | 'DCA'>(defaultType);
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [status, setStatus] = React.useState('');
