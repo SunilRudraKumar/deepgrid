@@ -18,94 +18,97 @@ export default function LandingPage() {
       {/* Background grid pattern */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(20,30,48,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(20,30,48,0.5)_1px,transparent_1px)] bg-[size:60px_60px] [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_70%)]" />
 
-      {/* Radar container */}
-      <div className="relative w-[500px] h-[500px] flex items-center justify-center">
-        {/* Radar rings */}
+      {/* Radar container - Now Full Screen Background */}
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-0 pointer-events-none">
+        {/* Radar rings - Scaled up */}
         {[1, 2, 3, 4, 5].map((ring) => (
           <div
             key={ring}
-            className="absolute rounded-full border border-cyan-500/20"
+            className="absolute rounded-full border border-cyan-500/10" // Reduced opacity for background
             style={{
-              width: `${ring * 100}px`,
-              height: `${ring * 100}px`,
+              width: `${ring * 25}vh`, // Use viewport units for massive scale
+              height: `${ring * 25}vh`,
+              maxWidth: `${ring * 25}vw`, // Ensure it fits width too
+              maxHeight: `${ring * 25}vw`,
             }}
           />
         ))}
 
-        {/* Animated radar sweep */}
+        {/* Animated radar sweep - Scaled to largest ring */}
         <div
-          className={`absolute w-full h-full ${mounted ? 'animate-spin' : ''}`}
+          className={`absolute w-[125vh] h-[125vh] ${mounted ? 'animate-spin' : ''}`}
           style={{
-            animationDuration: '4s',
+            animationDuration: '10s', // Slower sweep for larger area
             animationTimingFunction: 'linear',
           }}
         >
           <div
-            className="absolute top-1/2 left-1/2 w-1/2 h-1 origin-left"
+            className="absolute top-1/2 left-1/2 w-1/2 h-2 origin-left"
             style={{
-              background: 'linear-gradient(90deg, rgba(6, 182, 212, 0.8), rgba(6, 182, 212, 0))',
+              background: 'linear-gradient(90deg, rgba(6, 182, 212, 0.4), rgba(6, 182, 212, 0))', // Subtle gradient
               transform: 'translateY(-50%)',
             }}
           />
           {/* Radar sweep glow */}
           <div
-            className="absolute top-1/2 left-1/2 w-1/2 h-[200px] origin-left"
+            className="absolute top-1/2 left-1/2 w-1/2 h-[500px] origin-left"
             style={{
-              background: 'conic-gradient(from 0deg, transparent, rgba(6, 182, 212, 0.1), transparent 60deg)',
+              background: 'conic-gradient(from 0deg, transparent, rgba(6, 182, 212, 0.05), transparent 45deg)',
               transform: 'translateY(-50%)',
             }}
           />
         </div>
 
-        {/* Pulsing dots (simulating liquidity nodes) */}
+        {/* Pulsing dots - Spread out */}
         {[
-          { x: 80, y: 60, delay: 0 },
-          { x: -100, y: 40, delay: 0.5 },
-          { x: 50, y: -90, delay: 1 },
-          { x: -60, y: -70, delay: 1.5 },
-          { x: 120, y: -30, delay: 2 },
-          { x: -150, y: 80, delay: 2.5 },
+          { x: 250, y: 150, delay: 0 },
+          { x: -300, y: 100, delay: 0.5 },
+          { x: 150, y: -280, delay: 1 },
+          { x: -200, y: -250, delay: 1.5 },
+          { x: 350, y: -100, delay: 2 },
+          { x: -450, y: 200, delay: 2.5 },
         ].map((dot, i) => (
           <div
             key={i}
-            className="absolute w-3 h-3 bg-cyan-400 rounded-full animate-pulse"
+            className="absolute w-4 h-4 bg-cyan-400/60 rounded-full animate-pulse blur-[1px]"
             style={{
               left: `calc(50% + ${dot.x}px)`,
               top: `calc(50% + ${dot.y}px)`,
               animationDelay: `${dot.delay}s`,
-              boxShadow: '0 0 20px rgba(6, 182, 212, 0.8), 0 0 40px rgba(6, 182, 212, 0.4)',
+              boxShadow: '0 0 30px rgba(6, 182, 212, 0.8), 0 0 60px rgba(6, 182, 212, 0.4)',
             }}
           />
         ))}
+      </div>
 
+      {/* Main Content - Centered z-10 */}
+      <div className="relative z-10 flex flex-col items-center">
         {/* Center logo */}
-        <div className="absolute flex flex-col items-center justify-center z-10">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-            <span className="text-3xl font-bold">DG</span>
-          </div>
+        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 mb-8">
+          <span className="text-4xl font-bold">DG</span>
         </div>
-      </div>
 
-      {/* Text content */}
-      <div className="mt-12 text-center z-10">
-        <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
-          DEEPGRID
-        </h1>
-        <p className="mt-4 text-xl text-cyan-300/80 tracking-widest uppercase">
-          Liquidity Automated
-        </p>
-        <p className="mt-2 text-sm text-zinc-500">
-          On-chain grid trading powered by DeepBook V3
-        </p>
-      </div>
+        {/* Text content */}
+        <div className="text-center">
+          <h1 className="text-6xl md:text-7xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent mb-4">
+            DEEPGRID
+          </h1>
+          <p className="text-2xl text-cyan-300/80 tracking-[0.2em] uppercase mb-4">
+            Liquidity Automated
+          </p>
+          <p className="text-zinc-400 text-lg">
+            On-chain trading powered by DeepBook V3
+          </p>
+        </div>
 
-      {/* CTA Button */}
-      <Link
-        href="/spot"
-        className="mt-10 px-8 py-3 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold text-lg hover:from-cyan-500 hover:to-blue-500 transition-all duration-300 shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105 z-10"
-      >
-        Launch Terminal
-      </Link>
+        {/* CTA Button */}
+        <Link
+          href="/spot"
+          className="mt-12 px-10 py-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-xl hover:from-cyan-500 hover:to-blue-500 transition-all duration-300 shadow-xl shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-105"
+        >
+          Launch Terminal
+        </Link>
+      </div>
 
       {/* Footer links */}
       <div className="absolute bottom-8 flex gap-8 text-sm text-zinc-500">

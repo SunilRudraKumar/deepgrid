@@ -11,6 +11,7 @@ import { DAppKitClientProvider } from '@/src/config/DAppKitClientProvider';
 import { useDAppKit, useCurrentAccount } from '@mysten/dapp-kit-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { buildLimitOrderTransaction } from '@/lib/deepbook/orders/limit-order';
+import { useTradeOrder } from '@/lib/hooks/useTradeOrder';
 
 // Modular components
 import {
@@ -33,17 +34,12 @@ function GridBotContent() {
     const botAccount = useGridBotAccount();
     const tradeCap = useMintTradeCap();
     const account = useCurrentAccount();
+    const { cancelAllOrders } = useTradeOrder({ managerId: botAccount.accountId });
 
-    // Remove legacy effect - hook handles it internally
-    // React.useEffect(() => { ... }) 
+    const [isBotRunning, setIsBotRunning] = React.useState(false);
 
-    // Grid configuration
-    const gridConfig = useGridConfig({
-        defaultMin: 3.50,
-        defaultMax: 4.50,
-        defaultGrids: 10,
-        defaultInvestment: 100,
-    });
+    // Grid configuration - No defaults
+    const gridConfig = useGridConfig({});
 
     // Fetch market data for mid price
     const summaryPoll = usePolling(
@@ -291,12 +287,21 @@ function GridBotContent() {
 
             console.log(LOG_PREFIX, 'Grid orders placed successfully:', result);
             setTimeout(() => botAccount.checkAccount(), 2000);
+            setIsBotRunning(true);
             alert(`Successfully placed ${validOrdersCount} grid orders!`);
 
         } catch (error: any) {
             console.error(LOG_PREFIX, 'Error building grid orders:', error);
             alert(`Error: ${error.message}`);
         }
+    };
+
+    const handleStopBot = async () => {
+        if (!confirm('Are you sure you want to stop the bot? This will cancel all open grid orders.')) {
+            return;
+        }
+        await cancelAllOrders({ poolKey: pool });
+        setIsBotRunning(false);
     };
 
     return (
@@ -336,13 +341,43 @@ function GridBotContent() {
                         levelCount={gridConfig.levels.length}
                     />
 
-                    <GridConfigPanel
-                        gridConfig={gridConfig}
-                        isAccountReady={botAccount.isReady && !!tradeCap.tradeCapId}
-                        onCreateBot={handleCreateBot}
-                        requiredFunds={fundsCheck.required}
-                        availableFunds={fundsCheck.available}
-                    />
+                    {isBotRunning ? (
+                        <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-6 flex flex-col items-center justify-center space-y-4 h-full min-h-[400px]">
+                            <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center animate-pulse">
+                                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                                    <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <div className="text-center space-y-2">
+                                <h3 className="text-2xl font-bold text-green-400">Bot is Running</h3>
+                                <p className="text-green-300/60 max-w-xs mx-auto">
+                                    Grid orders are active. The bot is monitoring the market and will execute trades within your range.
+                                </p>
+                            </div>
+
+                            <div className="pt-6 w-full max-w-xs">
+                                <button
+                                    onClick={handleStopBot}
+                                    className="w-full px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all font-medium flex items-center justify-center gap-2 group"
+                                >
+                                    <span>Stop Bot</span>
+                                </button>
+                                <p className="text-[10px] text-red-400/50 text-center mt-2">
+                                    Cancels all open orders and stops trading
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <GridConfigPanel
+                            gridConfig={gridConfig}
+                            isAccountReady={botAccount.isReady && !!tradeCap.tradeCapId}
+                            onCreateBot={handleCreateBot}
+                            requiredFunds={fundsCheck.required}
+                            availableFunds={fundsCheck.available}
+                        />
+                    )}
                 </div>
 
                 {/* Grid Levels Table */}

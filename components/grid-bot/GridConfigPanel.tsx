@@ -118,7 +118,7 @@ export default function GridConfigPanel({
                 >
                     {!isAccountReady
                         ? 'Setup Account First'
-                        : 'Create Grid Bot'}
+                        : 'Start Bot'}
                 </button>
             </div>
         </div>
@@ -147,9 +147,10 @@ function PriceRangeInputs({
                     <input
                         type="number"
                         step="0.01"
-                        value={min}
+                        value={min || ''}
                         onChange={(e) => onMinChange(Number(e.target.value))}
-                        className="w-full mt-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500/50"
+                        placeholder="0.00"
+                        className="w-full mt-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
                     />
                 </div>
                 <div>
@@ -157,9 +158,10 @@ function PriceRangeInputs({
                     <input
                         type="number"
                         step="0.01"
-                        value={max}
+                        value={max || ''}
                         onChange={(e) => onMaxChange(Number(e.target.value))}
-                        className="w-full mt-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500/50"
+                        placeholder="0.00"
+                        className="w-full mt-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
                     />
                 </div>
             </div>
@@ -199,9 +201,10 @@ function GridCountInput({
                 type="number"
                 min="2"
                 max="100"
-                value={value}
+                value={value || ''}
                 onChange={(e) => onChange(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500/50"
+                placeholder="e.g. 10"
+                className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
             />
         </div>
     );
@@ -220,9 +223,10 @@ function InvestmentInput({
             <input
                 type="number"
                 step="10"
-                value={value}
+                value={value || ''}
                 onChange={(e) => onChange(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500/50"
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
             />
         </div>
     );
