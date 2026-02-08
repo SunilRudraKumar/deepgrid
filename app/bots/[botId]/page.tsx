@@ -5,13 +5,16 @@ import { BotProvider } from '@/lib/context/BotContext';
 import BotPageClient from '@/components/dashboard/BotPageClient';
 
 interface BotPageProps {
-    params: {
+    params: Promise<{
         botId: string;
-    };
+    }>;
 }
 
 export default async function BotPage({ params }: BotPageProps) {
-    const bot = await getBot(params.botId);
+    // Next.js 16: params is now a Promise, must be awaited
+    const { botId } = await params;
+
+    const bot = await getBot(botId);
 
     if (!bot) {
         notFound();
