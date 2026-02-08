@@ -24,7 +24,7 @@ export default function BotPageClient({ botName, botStatus, balanceManagerId }: 
 
     // Grid bot account and trade cap - pass explicit manager ID from DB
     const botAccount = useGridBotAccount({ explicitManagerId: balanceManagerId });
-    const tradeCap = useMintTradeCap();
+    const tradeCap = useMintTradeCap({ explicitManagerId: balanceManagerId });
 
     // Grid configuration
     const gridConfig = useGridConfig({

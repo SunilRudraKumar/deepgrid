@@ -31,7 +31,13 @@ interface UseMintTradeCapReturn {
     reset: () => void;
 }
 
-export function useMintTradeCap(): UseMintTradeCapReturn {
+interface UseMintTradeCapOptions {
+    /** If provided, use this manager ID for TradeCap lookups */
+    explicitManagerId?: string;
+}
+
+export function useMintTradeCap(options: UseMintTradeCapOptions = {}): UseMintTradeCapReturn {
+    const { explicitManagerId } = options;
     const account = useCurrentAccount();
     const dAppKit = useDAppKit();
 
@@ -72,17 +78,18 @@ export function useMintTradeCap(): UseMintTradeCapReturn {
         }
     }, [account?.address, network]);
 
-    // Auto-check for TradeCaps when wallet connects
+    // Auto-check for TradeCaps when wallet connects - use explicit manager ID if provided
     useEffect(() => {
         if (account?.address) {
-            checkTradeCaps();
+            console.log(LOG_PREFIX, 'Auto-check with explicitManagerId:', explicitManagerId);
+            checkTradeCaps(explicitManagerId);
         } else {
             // Reset when wallet disconnects
             setTradeCapId(null);
             setTradeCapIds([]);
             setStatus('idle');
         }
-    }, [account?.address, checkTradeCaps]);
+    }, [account?.address, explicitManagerId, checkTradeCaps]);
 
     const mintTradeCap = useCallback(async (balanceManagerId: string): Promise<string | null> => {
         console.log(LOG_PREFIX, 'mintTradeCap called', {
