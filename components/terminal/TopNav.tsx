@@ -26,11 +26,8 @@ export default function TopNav() {
             <div className="flex items-center gap-8">
                 {/* Logo - links to landing page */}
                 <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <div className="w-8 h-8 rounded bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center font-bold text-white">
-                        DG
-                    </div>
-                    <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-                        DEEP GRID
+                    <span className="font-black italic text-xl tracking-widest bg-gradient-to-b from-white via-gray-200 to-neutral-500 bg-clip-text text-transparent drop-shadow-sm">
+                        DEEPGRID
                     </span>
                 </Link>
 

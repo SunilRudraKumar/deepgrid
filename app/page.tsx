@@ -83,21 +83,16 @@ export default function LandingPage() {
 
       {/* Main Content - Centered z-10 */}
       <div className="relative z-10 flex flex-col items-center">
-        {/* Center logo */}
-        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 mb-8">
-          <span className="text-4xl font-bold">DG</span>
-        </div>
-
         {/* Text content */}
-        <div className="text-center">
-          <h1 className="text-6xl md:text-7xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent mb-4">
+        <div className="text-center mt-20">
+          <h1 className="text-6xl md:text-8xl font-black italic tracking-widest bg-gradient-to-b from-white via-gray-200 to-neutral-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)] mb-4">
             DEEPGRID
           </h1>
-          <p className="text-2xl text-cyan-300/80 tracking-[0.2em] uppercase mb-4">
+          <p className="text-xl text-cyan-300/80 tracking-[0.3em] uppercase mb-4 font-light">
             Liquidity Automated
           </p>
-          <p className="text-zinc-400 text-lg">
-            On-chain trading powered by DeepBook V3
+          <p className="text-zinc-500 text-lg max-w-lg mx-auto">
+            On-chain grid trading powered by DeepBook V3
           </p>
         </div>
 
