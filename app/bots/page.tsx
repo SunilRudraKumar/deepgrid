@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import TopNav from '@/components/terminal/TopNav';
 
 interface BotCard {
     id: string;
@@ -165,25 +166,7 @@ export default function BotsPage() {
 
     return (
         <div className="min-h-screen bg-[#0b0f14] text-white">
-            {/* Header */}
-            <header className="h-[56px] border-b border-white/5 flex items-center justify-between px-6">
-                <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <div className="w-8 h-8 rounded bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center font-bold text-white text-sm">
-                        DG
-                    </div>
-                    <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-                        DEEP GRID
-                    </span>
-                </Link>
-                <nav className="flex items-center gap-6">
-                    <Link href="/spot" className="text-sm text-white/50 hover:text-white transition-colors">
-                        Terminal
-                    </Link>
-                    <Link href="/bots" className="text-sm text-white font-medium">
-                        Bots
-                    </Link>
-                </nav>
-            </header>
+            <TopNav />
 
             {/* Content */}
             <main className="max-w-4xl mx-auto px-6 py-12">

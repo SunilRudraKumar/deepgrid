@@ -21,6 +21,7 @@ import {
     GridBotHeader,
     GridActiveOrders,
 } from '@/components/grid-bot';
+import TopNav from '@/components/terminal/TopNav';
 
 const LOG_PREFIX = '[GridBotPage]';
 
@@ -209,7 +210,10 @@ function GridBotContent() {
 
     return (
         <div className="min-h-screen bg-[#0b0f14] text-white">
-            {/* Header */}
+            {/* Consistent NavBar */}
+            <TopNav />
+
+            {/* Title Bar */}
             <GridBotHeader pool={pool} midPrice={midPrice} />
 
             {/* Main Content */}
