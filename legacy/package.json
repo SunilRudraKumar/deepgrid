@@ -1,0 +1,40 @@
+{
+  "name": "deepgrid",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "test": "pnpm -r test",
+    "dev": "pnpm -r --parallel dev",
+    "dev:api": "pnpm --filter @deepgrid/api dev",
+    "dev:web": "pnpm --filter @deepgrid/web dev",
+    "bot:gen": "pnpm --filter @deepgrid/cli bot:gen",
+    "bot:fund": "pnpm --filter @deepgrid/cli bot:fund",
+    "tradecap:mint": "pnpm --filter @deepgrid/cli tradecap:mint",
+    "deposit": "pnpm --filter @deepgrid/cli deposit",
+    "smoke": "pnpm --filter @deepgrid/cli trade:smoke",
+    "grid": "pnpm --filter @deepgrid/cli grid:run",
+    "mid": "pnpm --filter @deepgrid/cli mid",
+    "pools": "pnpm --filter @deepgrid/cli pools",
+    "managers": "pnpm --filter @deepgrid/cli managers",
+    "state": "pnpm --filter @deepgrid/cli state",
+    "orders": "pnpm --filter @deepgrid/cli orders",
+    "balances": "pnpm --filter @deepgrid/cli balances"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.23.0",
+  "dependencies": {
+    "@mysten/deepbook-v3": "1.0.3",
+    "@mysten/sui": "2.2.0",
+    "dotenv": "^17.2.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,148 @@
+import * as deepbookV3 from '@mysten/deepbook-v3';
+import { deepbook } from '@mysten/deepbook-v3';
+import { SuiGrpcClient } from '@mysten/sui/grpc';
+import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { opt } from './env';
+
+export type Net = 'testnet' | 'mainnet';
+
+export const SUI_COIN_TYPE =
+  '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI';
+
+export function fullnodeUrl(net: Net): string {
+  return net === 'mainnet'
+    ? 'https://fullnode.mainnet.sui.io:443'
+    : 'https://fullnode.testnet.sui.io:443';
+}
+
+export function keypairFromSuiPrivKey(pk: string): Ed25519Keypair {
+  const { scheme, secretKey } = decodeSuiPrivateKey(pk);
+  if (scheme !== 'ED25519') throw new Error(`Unsupported scheme: ${scheme}`);
+  return Ed25519Keypair.fromSecretKey(secretKey);
+}
+
+export function suiToMist(amount: number | string): bigint {
+  const s = String(amount).trim();
+  if (!/^\d+(\.\d+)?$/.test(s)) throw new Error(`Invalid SUI amount: ${amount}`);
+  const [w, fRaw = ''] = s.split('.');
+  const f = (fRaw + '000000000').slice(0, 9); // 9 decimals
+  return BigInt(w) * 1_000_000_000n + BigInt(f);
+}
+
+export function mistToSui(mist: bigint): number {
+  // ok for display/logging
+  return Number(mist) / 1e9;
+}
+
+function extractBalanceMist(resp: any): bigint {
+  // Handles grpc shapes that vary across versions
+  const cands = [
+    resp?.balance,
+    resp?.totalBalance,
+    resp?.coinBalance,
+    resp?.addressBalance,
+    resp?.balance?.balance,
+    resp?.balance?.coinBalance,
+    resp?.balance?.totalBalance,
+  ];
+  for (const c of cands) {
+    if (typeof c === 'string' && c.length) return BigInt(c);
+  }
+  return 0n;
+}
+
+export async function getGasMist(client: any, owner: string): Promise<bigint> {
+  const r = await client.core.getBalance({ owner, coinType: SUI_COIN_TYPE });
+  return extractBalanceMist(r);
+}
+
+export function poolKeyFromEnv(fallback = 'SUI_DBUSDC'): string {
+  return opt('DEEPBOOK_POOL_KEY') ?? fallback;
+}
+
+/**
+ * Read pool metadata from the SDK exports.
+ * This avoids hardcoding DBUSDC/SUI and makes switching pools trivial.
+ */
+function poolsFor(net: Net): Record<string, any> | undefined {
+  const key = net === 'mainnet' ? 'mainnetPools' : 'testnetPools';
+  return (deepbookV3 as any)[key] as Record<string, any> | undefined;
+}
+
+export function listKnownPools(net: Net): Array<{
+  poolKey: string;
+  baseCoinKey: string;
+  quoteCoinKey: string;
+}> {
+  const pools = poolsFor(net);
+  if (!pools) return [];
+  return Object.entries(pools).map(([poolKey, p]) => ({
+    poolKey,
+    baseCoinKey: String((p as any).baseCoin ?? ''),
+    quoteCoinKey: String((p as any).quoteCoin ?? ''),
+  }));
+}
+
+/**
+ * Resolve base/quote coin keys for a pool (e.g. "SUI_DBUSDC" -> { baseCoinKey: "SUI", quoteCoinKey: "DBUSDC" }).
+ * If SDK pool metadata isn’t available (or poolKey unknown), caller can fallback to env overrides.
+ */
+export function resolvePoolCoinKeys(
+  net: Net,
+  poolKey: string,
+): { baseCoinKey: string; quoteCoinKey: string } {
+  const pools = poolsFor(net);
+  if (!pools) {
+    throw new Error(
+      `DeepBook SDK pool metadata not available. Set BASE_COIN_KEY and QUOTE_COIN_KEY env vars as a fallback.`,
+    );
+  }
+
+  const p = pools[poolKey];
+  if (!p) {
+    const known = Object.keys(pools);
+    throw new Error(
+      `Unknown DEEPBOOK_POOL_KEY="${poolKey}" for ${net}. Known pools: ${known.join(', ')}`,
+    );
+  }
+
+  const baseCoinKey = (p as any).baseCoin;
+  const quoteCoinKey = (p as any).quoteCoin;
+
+  if (!baseCoinKey || !quoteCoinKey) {
+    throw new Error(
+      `Pool "${poolKey}" is missing baseCoin/quoteCoin metadata. Set BASE_COIN_KEY and QUOTE_COIN_KEY env vars.`,
+    );
+  }
+
+  return { baseCoinKey, quoteCoinKey };
+}
+
+export function makeDeepbookClient(args: {
+  net: Net;
+  address: string;
+
+  // optional: only required for manager ops / trading
+  managerKey?: string;
+  managerId?: string;
+  tradeCapId?: string;
+}) {
+  const client = new SuiGrpcClient({ network: args.net, baseUrl: fullnodeUrl(args.net) }).$extend(
+    deepbook({
+      address: args.address,
+      network: args.net,
+      balanceManagers:
+        args.managerKey && args.managerId
+          ? {
+            [args.managerKey]: {
+              address: args.managerId,
+              ...(args.tradeCapId ? { tradeCap: args.tradeCapId } : {}),
+            },
+          }
+          : undefined,
+    }),
+  );
+
+  return client;
+}
