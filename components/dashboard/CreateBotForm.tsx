@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { createTradingAccountTransaction } from '@/lib/features/deepbook/create-account';
+import { checkTradingAccount } from '@/lib/features/onboarding/check-account';
 import { registerBot } from '@/lib/actions/bot-actions';
 
 export function CreateBotForm() {
@@ -15,6 +16,7 @@ export function CreateBotForm() {
     const [type, setType] = React.useState<'GRID' | 'DCA'>('GRID');
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const [status, setStatus] = React.useState('');
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,10 +35,16 @@ export function CreateBotForm() {
         setIsLoading(true);
 
         try {
-            // 1. Prepare Transaction
+            // 1. Get existing manager IDs before creation
+            setStatus('Checking existing accounts...');
+            const beforeCheck = await checkTradingAccount(account.address, 'mainnet');
+            const existingIds = beforeCheck.accountIds || [];
+            console.log('[CreateBot] Existing manager IDs:', existingIds);
+
+            // 2. Prepare & Execute Transaction
+            setStatus('Creating BalanceManager on-chain...');
             const tx = await createTradingAccountTransaction(account.address, 'mainnet');
 
-            // 2. Execute on Chain
             const result = await dAppKit.signAndExecuteTransaction({
                 transaction: tx,
             });
@@ -48,21 +56,62 @@ export function CreateBotForm() {
                 throw new Error(errorMsg);
             }
 
-            console.log('Bot created on chain');
+            console.log('[CreateBot] Transaction succeeded');
 
-            // 3. Wait briefly for indexer
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // 3. Wait for indexer to pick up the new object
+            setStatus('Waiting for chain indexer...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
-            // 4. For now, redirect to dashboard since parsing objectChanges from this SDK type is complex
-            // The dashboard will show the new bot once indexed
-            alert('Bot created successfully! Redirecting to dashboard...');
-            router.push('/dashboard');
+            // 4. Re-check to find the new manager ID
+            setStatus('Finding new BalanceManager...');
+            const afterCheck = await checkTradingAccount(account.address, 'mainnet');
+            const newIds = afterCheck.accountIds || [];
+            console.log('[CreateBot] New manager IDs:', newIds);
+
+            // Find the new ID (one that wasn't in existingIds)
+            const newManagerId = newIds.find(id => !existingIds.includes(id));
+
+            if (!newManagerId) {
+                // Fallback: just use the last one if we can't find the new one
+                const fallbackId = newIds[newIds.length - 1];
+                if (fallbackId) {
+                    console.log('[CreateBot] Using fallback manager ID:', fallbackId);
+                    await saveBot(fallbackId);
+                } else {
+                    throw new Error('Could not find the newly created BalanceManager');
+                }
+            } else {
+                console.log('[CreateBot] Found new manager ID:', newManagerId);
+                await saveBot(newManagerId);
+            }
 
         } catch (err: any) {
-            console.error(err);
+            console.error('[CreateBot] Error:', err);
             setError(err.message || 'An error occurred');
             setIsLoading(false);
+            setStatus('');
         }
+    };
+
+    const saveBot = async (balanceManagerId: string) => {
+        if (!account?.address) return;
+
+        setStatus('Registering bot in database...');
+
+        // 5. Register in database
+        const bot = await registerBot({
+            ownerAddress: account.address,
+            name,
+            type,
+            balanceManagerId,
+            network: 'mainnet'
+        });
+
+        console.log('[CreateBot] Bot registered:', bot);
+        setStatus('Success!');
+
+        // Redirect to bot page or dashboard
+        router.push('/dashboard');
     };
 
     return (
@@ -115,6 +164,13 @@ export function CreateBotForm() {
                     </div>
                 </div>
 
+                {status && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-sm flex items-center gap-2">
+                        <span className="animate-spin">⏳</span>
+                        {status}
+                    </div>
+                )}
+
                 {error && (
                     <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
                         {error}
@@ -126,7 +182,7 @@ export function CreateBotForm() {
                     disabled={isLoading || !account}
                     className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isLoading ? 'Creating On-Chain...' : 'Create Bot & Manager'}
+                    {isLoading ? 'Creating...' : 'Create Bot & Manager'}
                 </button>
             </form>
         </div>
