@@ -63,10 +63,10 @@ export function useGridBotAccount(options: UseGridBotAccountOptions = {}): UseGr
     // Helper to fetch balances if accountId is set
     const fetchBalances = useCallback(async (managerId: string) => {
         try {
-            // console.log(LOG_PREFIX, 'Fetching balances for manager:', managerId);
+            console.log(LOG_PREFIX, 'Fetching balances for manager:', managerId);
             const results = await fetchAccountBalances(managerId, network, account?.address);
             setBalances(results);
-            // console.log(LOG_PREFIX, 'Balances updated:', results);
+            console.log(LOG_PREFIX, 'Balances updated:', results);
         } catch (err) {
             console.error(LOG_PREFIX, 'Error fetching balances:', err);
         }
@@ -218,12 +218,16 @@ export function useGridBotAccount(options: UseGridBotAccountOptions = {}): UseGr
         }
     }, [account?.address, accountId, network, dAppKit, status, fetchBalances]);
 
-    // Manual refresh
+    // Manual refresh - prefer explicitManagerId, then state accountId
     const refreshBalances = useCallback(async () => {
-        if (accountId) {
-            await fetchBalances(accountId);
+        const idToUse = explicitManagerId || accountId;
+        if (idToUse) {
+            console.log(LOG_PREFIX, 'refreshBalances called with ID:', idToUse);
+            await fetchBalances(idToUse);
+        } else {
+            console.log(LOG_PREFIX, 'refreshBalances called but no ID available');
         }
-    }, [accountId, fetchBalances]);
+    }, [explicitManagerId, accountId, fetchBalances]);
 
     // Auto-check when wallet connects
     useEffect(() => {
